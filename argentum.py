@@ -1755,6 +1755,86 @@ def get_leaderboard(top: int = 10) -> str:
     return "\n".join(lines)
 
 
+@app.post("/nexus/trail")
+async def nexus_trail(request: Request):
+    """Registra un trail desde un receipt externo NEXUS.
+
+    NEXUS (nexus-agent-xa12.onrender.com) no usa firma Ed25519 — la autenticación
+    es la recomputación del action_ref desde los 4 preimage fields. Si el action_ref
+    no coincide, el trail se rechaza.
+
+    Body: receipt NEXUS (packet_version 1.0):
+      {action_ref, service, preimage: {agent_id, action_type, scope, ts},
+       payment_hash, output_hash, hash_algo, preimage_format, timestamp, ...}
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+    action_ref = body.get("action_ref", "")
+    service = body.get("service", "")
+    payment_hash = body.get("payment_hash", "") or ""
+    preimage = body.get("preimage") or {}
+
+    agent_id = preimage.get("agent_id", "")
+    action_type = preimage.get("action_type", "")
+    scope = preimage.get("scope", "")
+    ts = preimage.get("ts")
+
+    if not (action_ref and service and agent_id and action_type and ts is not None):
+        return JSONResponse(
+            {"error": "action_ref, service, preimage.{agent_id,action_type,scope,ts} required"},
+            status_code=400,
+        )
+
+    # Recomputar action_ref para validar integridad del receipt
+    import json as _json2
+    canonical = _json2.dumps(
+        dict(sorted({"agent_id": agent_id, "action_type": action_type,
+                     "scope": scope or "", "timestamp": str(ts)}.items())),
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    expected = hashlib.sha256(canonical).hexdigest()
+
+    # NEXUS usa preimage_format "agent_id:action_type:scope:ts" (colon-separated)
+    # pero el spec action-ref.md v1.0 usa JCS. Aceptamos ambos durante transición.
+    if action_ref != expected:
+        colon_payload = f"{agent_id}:{action_type}:{scope or ''}:{int(ts)}"
+        colon_ref = hashlib.sha256(colon_payload.encode("utf-8")).hexdigest()
+        if action_ref != colon_ref:
+            return JSONResponse(
+                {"error": "action_ref mismatch — receipt tampered or preimage incorrect"},
+                status_code=422,
+            )
+
+    trail_id = mycelium_trails.record_trail(
+        TRAILS_DB,
+        agent_id=agent_id,
+        service=service,
+        operation=action_type,
+        nonce=action_ref,          # action_ref es el nonce determinístico
+        karma_at_time=None,
+        success=True,
+        scope=scope or None,
+        delegation_ref=payment_hash or None,  # payment_hash externo NEXUS
+    )
+
+    if trail_id is None:
+        return JSONResponse({"error": "rate limit exceeded or invalid input"}, status_code=429)
+
+    return JSONResponse({
+        "trail_id": trail_id,
+        "agent_id": agent_id,
+        "service": service,
+        "operation": action_type,
+        "action_ref": action_ref,
+        "payment_hash": payment_hash or None,
+        "trail_status": "committed",
+    }, status_code=201)
+
+
 if __name__ == "__main__":
     import threading
     import uvicorn as _uvicorn
