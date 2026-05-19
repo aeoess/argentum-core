@@ -15,7 +15,8 @@ Projects and systems using Mycelium Trails or building on the argentum-core prot
 ## Ecosystem references
 
 - [aeoess/agent-governance-vocabulary PR #96](https://github.com/aeoess/agent-governance-vocabulary/pull/96) — `crosswalk/mycelium-trails.yaml` v0.1
-- [microsoft/agent-governance-toolkit PR #2244](https://github.com/microsoft/agent-governance-toolkit/pull/2244) — EvidenceAnchor community plugin (open)
+- [kenneives/agent-governance-vocabulary PR #1](https://github.com/kenneives/agent-governance-vocabulary/pull/1) — `crosswalk/mycelium.yaml` v0.3.2 (open, deadline May 27)
+- [microsoft/agent-governance-toolkit PR #2415](https://github.com/microsoft/agent-governance-toolkit/pull/2415) — `mycelium-agt` standalone EvidenceAnchor backend (open)
 - [linus10x/finserv-agent-audit](https://github.com/linus10x/finserv-agent-audit) — cross-reference on tamper-evidence boundary for EU AI Act compliance
 
 ---
