@@ -1,0 +1,110 @@
+{
+  "version": "v1",
+  "urn": "urn:mycelium:trail",
+  "claim_type": "continuity",
+  "evidenceType": "observational",
+  "spec": "JCS — RFC 8785",
+  "hash_algo": "sha256",
+  "preimage_format": "jcs-rfc8785",
+  "source_provider": "https://argentum-api.rgiskard.xyz",
+  "canonical_spec": "https://github.com/giskard09/argentum-core/blob/main/docs/spec/action-ref.md",
+  "generated_at": "2026-05-21",
+  "description": "Conformance fixtures for urn:mycelium:trail — CTEF v0.3.3 cross-extension matrix row #2. claim_type=continuity / evidenceType=observational. The action_ref is SHA-256(JCS(preimage fields)); the envelope canonical_sha256 is SHA-256(JCS(full envelope)). Both are byte-identical across all RFC 8785-conformant implementations.",
+  "reproduce_in_python": "import hashlib, json\ndef jcs(obj): return json.dumps(obj, separators=(',',':'), sort_keys=True, ensure_ascii=False)\npreimage = {'action_type': '...', 'agent_id': '...', 'scope': '...', 'timestamp': '...'}\naction_ref = hashlib.sha256(jcs(preimage).encode()).hexdigest()\nenvelope = {'action_ref': action_ref, 'claim_type': 'continuity', 'evidenceType': 'observational', 'hash_algo': 'sha256', 'preimage': preimage, 'preimage_format': 'jcs-rfc8785', 'source_provider': 'https://argentum-api.rgiskard.xyz', 'urn': 'urn:mycelium:trail'}\nprint(hashlib.sha256(jcs(envelope).encode()).hexdigest())",
+  "vectors": [
+    {
+      "name": "nexus-oracle-signal",
+      "description": "NEXUS oracle signal (BTC price feed). action_ref matches the canonical example in docs/spec/action-ref.md — byte-identical cross-reference anchor.",
+      "preimage": {
+        "action_type": "oracle.signal",
+        "agent_id": "nexus-agent-xa12.onrender.com",
+        "scope": "BTC",
+        "timestamp": "2025-05-18T11:40:31.000Z"
+      },
+      "action_ref": "fdd7f810499f06be24355ca8e2bfb8c4b965cc80c838f41fa074683443d89f5a",
+      "trail_id": "ea145ca5-e9ac-4900-b583-a2e1bea61140",
+      "tx_hash": "7fd0a8ededd1feb65ab37b3324218a0386dbf124174cf122bffc40717c057b84",
+      "envelope": {
+        "action_ref": "fdd7f810499f06be24355ca8e2bfb8c4b965cc80c838f41fa074683443d89f5a",
+        "claim_type": "continuity",
+        "evidenceType": "observational",
+        "hash_algo": "sha256",
+        "preimage": {
+          "action_type": "oracle.signal",
+          "agent_id": "nexus-agent-xa12.onrender.com",
+          "scope": "BTC",
+          "timestamp": "2025-05-18T11:40:31.000Z"
+        },
+        "preimage_format": "jcs-rfc8785",
+        "source_provider": "https://argentum-api.rgiskard.xyz",
+        "trail_id": "ea145ca5-e9ac-4900-b583-a2e1bea61140",
+        "tx_hash": "7fd0a8ededd1feb65ab37b3324218a0386dbf124174cf122bffc40717c057b84",
+        "urn": "urn:mycelium:trail"
+      },
+      "canonical_bytes_hex": "7b22616374696f6e5f726566223a2266646437663831303439396630366265323433353563613865326266623863346239363563633830633833386634316661303734363833343433643839663561222c22636c61696d5f74797065223a22636f6e74696e75697479222c2265766964656e636554797065223a226f62736572766174696f6e616c222c22686173685f616c676f223a22736861323536222c22707265696d616765223a7b22616374696f6e5f74797065223a226f7261636c652e7369676e616c222c226167656e745f6964223a226e657875732d6167656e742d786131322e6f6e72656e6465722e636f6d222c2273636f7065223a22425443222c2274696d657374616d70223a22323032352d30352d31385431313a34303a33312e3030305a227d2c22707265696d6167655f666f726d6174223a226a63732d72666338373835222c22736f757263655f70726f7669646572223a2268747470733a2f2f617267656e74756d2d6170692e726769736b6172642e78797a222c22747261696c5f6964223a2265613134356361352d653961632d343930302d623538332d613265316265613631313430222c2274785f68617368223a2237666430613865646564643166656236356162333762333332343231386130333836646266313234313734636631323262666663343037313763303537623834222c2275726e223a2275726e3a6d7963656c69756d3a747261696c227d",
+      "canonical_sha256": "8af1dad8c307513b3a52ad378a7b45ff2812462f7c489baa547cb747c0f5d879",
+      "verify_url": "https://argentum-api.rgiskard.xyz/trails/verify?agent_id=nexus-agent-xa12.onrender.com&action_ref=fdd7f810499f06be24355ca8e2bfb8c4b965cc80c838f41fa074683443d89f5a"
+    },
+    {
+      "name": "giskard-self-enter-oasis",
+      "description": "giskard-self agent entering Oasis (consultation service). Real trail from 2026-04-13 anchored on Base mainnet.",
+      "preimage": {
+        "action_type": "enter_oasis",
+        "agent_id": "giskard-self",
+        "scope": "giskard-oasis",
+        "timestamp": "2026-04-13T02:47:35.000Z"
+      },
+      "action_ref": "d50f511cb510d52ad08bf0777f2e1ec4c0d17f5dadcc780c5c6ebbad7f9ccd8f",
+      "trail_id": "c3a1b2d4-0001-0002-0003-000000000001",
+      "tx_hash": "0x7fd0a8ededd1feb65ab37b3324218a0386dbf124174cf122bffc40717c057b84",
+      "envelope": {
+        "action_ref": "d50f511cb510d52ad08bf0777f2e1ec4c0d17f5dadcc780c5c6ebbad7f9ccd8f",
+        "claim_type": "continuity",
+        "evidenceType": "observational",
+        "hash_algo": "sha256",
+        "preimage": {
+          "action_type": "enter_oasis",
+          "agent_id": "giskard-self",
+          "scope": "giskard-oasis",
+          "timestamp": "2026-04-13T02:47:35.000Z"
+        },
+        "preimage_format": "jcs-rfc8785",
+        "source_provider": "https://argentum-api.rgiskard.xyz",
+        "trail_id": "c3a1b2d4-0001-0002-0003-000000000001",
+        "tx_hash": "0x7fd0a8ededd1feb65ab37b3324218a0386dbf124174cf122bffc40717c057b84",
+        "urn": "urn:mycelium:trail"
+      },
+      "canonical_bytes_hex": "7b22616374696f6e5f726566223a2264353066353131636235313064353261643038626630373737663265316563346330643137663564616463633738306335633665626261643766396363643866222c22636c61696d5f74797065223a22636f6e74696e75697479222c2265766964656e636554797065223a226f62736572766174696f6e616c222c22686173685f616c676f223a22736861323536222c22707265696d616765223a7b22616374696f6e5f74797065223a22656e7465725f6f61736973222c226167656e745f6964223a226769736b6172642d73656c66222c2273636f7065223a226769736b6172642d6f61736973222c2274696d657374616d70223a22323032362d30342d31335430323a34373a33352e3030305a227d2c22707265696d6167655f666f726d6174223a226a63732d72666338373835222c22736f757263655f70726f7669646572223a2268747470733a2f2f617267656e74756d2d6170692e726769736b6172642e78797a222c22747261696c5f6964223a2263336131623264342d303030312d303030322d303030332d303030303030303030303031222c2274785f68617368223a22307837666430613865646564643166656236356162333762333332343231386130333836646266313234313734636631323262666663343037313763303537623834222c2275726e223a2275726e3a6d7963656c69756d3a747261696c227d",
+      "canonical_sha256": "e6e7df287cda6aec73bcfb1a1cd90861123ea113d1cb5e68ea812b08f352a7c2",
+      "verify_url": "https://argentum-api.rgiskard.xyz/trails/verify?agent_id=giskard-self&action_ref=d50f511cb510d52ad08bf0777f2e1ec4c0d17f5dadcc780c5c6ebbad7f9ccd8f"
+    },
+    {
+      "name": "pioneer-negotiation-accept",
+      "description": "pioneer-agent-001 accepting a negotiation on Soma marketplace. Demonstrates negotiation.accept action_type in continuity trail.",
+      "preimage": {
+        "action_type": "negotiation.accept",
+        "agent_id": "pioneer-agent-001",
+        "scope": "soma-marketplace",
+        "timestamp": "2026-05-21T10:00:00.000Z"
+      },
+      "action_ref": "546ef9d5f59506b8cf150f3033648b1ef2105972ff3e19b7d69e9d02cf6c355f",
+      "envelope": {
+        "action_ref": "546ef9d5f59506b8cf150f3033648b1ef2105972ff3e19b7d69e9d02cf6c355f",
+        "claim_type": "continuity",
+        "evidenceType": "observational",
+        "hash_algo": "sha256",
+        "preimage": {
+          "action_type": "negotiation.accept",
+          "agent_id": "pioneer-agent-001",
+          "scope": "soma-marketplace",
+          "timestamp": "2026-05-21T10:00:00.000Z"
+        },
+        "preimage_format": "jcs-rfc8785",
+        "source_provider": "https://argentum-api.rgiskard.xyz",
+        "urn": "urn:mycelium:trail"
+      },
+      "canonical_bytes_hex": "7b22616374696f6e5f726566223a2235343665663964356635393530366238636631353066333033333634386231656632313035393732666633653139623764363965396430326366366333353566222c22636c61696d5f74797065223a22636f6e74696e75697479222c2265766964656e636554797065223a226f62736572766174696f6e616c222c22686173685f616c676f223a22736861323536222c22707265696d616765223a7b22616374696f6e5f74797065223a226e65676f74696174696f6e2e616363657074222c226167656e745f6964223a2270696f6e6565722d6167656e742d303031222c2273636f7065223a22736f6d612d6d61726b6574706c616365222c2274696d657374616d70223a22323032362d30352d32315431303a30303a30302e3030305a227d2c22707265696d6167655f666f726d6174223a226a63732d72666338373835222c22736f757263655f70726f7669646572223a2268747470733a2f2f617267656e74756d2d6170692e726769736b6172642e78797a222c2275726e223a2275726e3a6d7963656c69756d3a747261696c227d",
+      "canonical_sha256": "4e1d2cb22fc3846f0df21e4bc496fe34e45a76c045d7c553933b27155fed750d"
+    }
+  ]
+}
