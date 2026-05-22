@@ -27,7 +27,10 @@ limiter = Limiter(key_func=get_remote_address)
 
 MEMORY_URL        = "http://localhost:8005"
 MARKS_URL         = "http://localhost:8015"
-MARKS_API_KEY     = os.environ.get("MARKS_API_KEY", "")
+MARKS_API_KEY        = os.environ.get("MARKS_API_KEY", "")
+ARGENTUM_SIGNING_KEY = os.environ.get("ARGENTUM_SIGNING_KEY", "")
+ARGENTUM_VERIFY_KEY  = os.environ.get("ARGENTUM_VERIFY_KEY", "")
+ARGENTUM_BASE_URL    = "https://argentum-api.rgiskard.xyz"
 ARBITRUM_CONTRACT = "0xD467CD1e34515d58F98f8Eb66C0892643ec86AD3"
 PAYG_WALLET       = os.environ.get("PAYG_WALLET", "")  # RAMA wallet — PAYG receiver Arbitrum mainnet
 ARGT_CONTRACT     = "0x42385c1038f3fec0ecCFBD4E794dE69935e89784"
@@ -703,6 +706,77 @@ def get_entity_usage(entity_id: str):
         "status":       status,
         "year_month":   mycelium_trails._year_month(),
     }
+
+
+def _sign_badge(payload: dict) -> str:
+    """Sign a badge payload with the Argentum server key. Returns base64 signature."""
+    import base64
+    from nacl.signing import SigningKey
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    sk = SigningKey(base64.b64decode(ARGENTUM_SIGNING_KEY))
+    return base64.b64encode(sk.sign(canonical).signature).decode("ascii")
+
+
+@app.get("/karma/{agent_id}")
+def get_karma(agent_id: str):
+    """Public karma endpoint — returns score + verifiable badge signed by Argentum."""
+    conn = get_db()
+    w = conn.execute("SELECT * FROM wisdom WHERE entity_id = ?", (agent_id,)).fetchone()
+    verified_count = 0
+    if w:
+        verified_count = conn.execute(
+            "SELECT COUNT(*) FROM actions WHERE entity_id = ? AND status = 'verified'",
+            (agent_id,)
+        ).fetchone()[0]
+    conn.close()
+
+    karma = dict(w)["total_karma"] if w else 0
+    verified_at = datetime.now(timezone.utc).isoformat()
+
+    badge_payload = {
+        "agent_id":       agent_id,
+        "karma":          karma,
+        "verified_at":    verified_at,
+        "verified_actions": verified_count,
+        "source":         f"{ARGENTUM_BASE_URL}/karma/{agent_id}",
+    }
+
+    sig = _sign_badge(badge_payload) if ARGENTUM_SIGNING_KEY else None
+
+    return {
+        **badge_payload,
+        "verify_key":  ARGENTUM_VERIFY_KEY or None,
+        "signature":   sig,
+        "verify_url":  f"{ARGENTUM_BASE_URL}/karma/{agent_id}/verify",
+    }
+
+
+@app.post("/karma/{agent_id}/verify")
+def verify_karma_badge(agent_id: str, body: dict):
+    """Verify a karma badge signed by Argentum. POST {badge_payload, signature}."""
+    import base64
+    from nacl.signing import VerifyKey
+    from nacl.exceptions import BadSignatureError
+
+    badge = body.get("badge")
+    signature = body.get("signature")
+    if not badge or not signature:
+        raise HTTPException(status_code=400, detail="badge and signature required")
+
+    if badge.get("agent_id") != agent_id:
+        raise HTTPException(status_code=400, detail="agent_id mismatch")
+
+    if not ARGENTUM_VERIFY_KEY:
+        raise HTTPException(status_code=503, detail="verify key not configured")
+
+    canonical = json.dumps(badge, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    try:
+        vk = VerifyKey(base64.b64decode(ARGENTUM_VERIFY_KEY))
+        vk.verify(canonical, base64.b64decode(signature))
+    except (BadSignatureError, Exception):
+        return {"valid": False, "reason": "invalid signature"}
+
+    return {"valid": True, "agent_id": agent_id, "karma": badge.get("karma")}
 
 
 @app.get("/commons")

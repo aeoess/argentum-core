@@ -46,16 +46,25 @@ When you reach 1,000 trails in a calendar month, the API returns:
 
 **$0.003 per trail.** No monthly commitment.
 
-> PAYG is available. Payment integration is under active development — contact
-> us to set up access.
-
 | | |
 |---|---|
 | **Price** | $0.003 / trail |
 | **Minimum purchase** | 1 trail |
 | **Maximum purchase** | 10,000 trails per invoice |
 | **Payment** | Lightning (sats) · USDC on Arbitrum |
-| **Credits** | Added on payment confirmation |
+| **Credits** | Added within 24h of on-chain confirmation |
+
+**Get started in two steps:**
+
+```bash
+# 1. Create your PAYG account
+curl -X POST "https://argentum-api.rgiskard.xyz/payg/account?agent_id=my-agent-001"
+
+# 2. Get a USDC deposit address for N trails
+curl -X POST https://argentum-api.rgiskard.xyz/payg/topup/usdc \
+  -H "Content-Type: application/json" \
+  -d '{"api_key": "<your-api-key>", "trails": 500}'
+```
 
 ## Enterprise
 
