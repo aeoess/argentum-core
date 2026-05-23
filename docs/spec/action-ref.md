@@ -29,6 +29,8 @@ def compute_action_ref(
     return hashlib.sha256(canonical).hexdigest()
 ```
 
+**Safe band:** the `json.dumps` approach above produces RFC 8785-compatible bytes for the specific input shapes this spec exercises: ASCII-only field values, RFC 3339 timestamp strings, no surrogate-pair Unicode, no `-0.0`. For inputs outside this band — non-ASCII agent identifiers, surrogate-pair scope strings — use `rfc8785` (Python) or an equivalent RFC 8785-compliant library to guarantee byte-level portability across implementations.
+
 Reference implementation: [`plugins/agt_evidence_anchor/action_ref.py`](../../plugins/agt_evidence_anchor/action_ref.py)
 
 ## Fields
@@ -90,7 +92,7 @@ Implementations that emit a receipt referencing this spec SHOULD include the fol
   "packet_version": "1.0",
   "action_ref": "<sha256 hex>",
   "hash_algo": "sha256",
-  "preimage_format": "jcs-rfc8785",
+  "preimage_format": "jcs-rfc8785-v1",
   "preimage": {
     "agent_id": "...",
     "action_type": "...",
@@ -154,7 +156,7 @@ window of credential exposure.
   "packet_version": "1.0",
   "action_ref": "<sha256 hex>",
   "hash_algo": "sha256",
-  "preimage_format": "jcs-rfc8785",
+  "preimage_format": "jcs-rfc8785-v1",
   "preimage": {
     "agent_id": "...",
     "action_type": "...",
@@ -196,6 +198,5 @@ Any verifier holding one artifact can validate against another without trusting 
 
 - Reference implementation: [`plugins/agt_evidence_anchor/action_ref.py`](../../plugins/agt_evidence_anchor/action_ref.py)
 - Full TrailRecord schema: [MYCELIUM_TRAILS_REFERENCE.md](../MYCELIUM_TRAILS_REFERENCE.md)
-- AGT EvidenceAnchor proposal (Microsoft): [agent-governance-toolkit PR #2244](https://github.com/microsoft/agent-governance-toolkit/pull/2244)
 - Joint spec with SafeAgent: [argentum-core#7](https://github.com/giskard09/argentum-core/issues/7)
 - Nobulex alignment: [MetaGPT#1991](https://github.com/geekan/MetaGPT/issues/1991)
