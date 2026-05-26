@@ -1,0 +1,76 @@
+{
+  "fixture_id": "composition-ref-v1",
+  "version": "v1",
+  "spec": "docs/spec/composition-ref.md",
+  "spec_stable_ref": "https://github.com/giskard09/argentum-core/blob/composition-ref-v1.0/docs/spec/composition-ref.md",
+  "hash_algo": "sha256",
+  "artifact_format": "jcs-rfc8785-v1",
+  "generated_at": "2026-05-26",
+  "purpose": "Formal conformance substrate for composition-ref-v1. An external implementer who reproduces composition_ref byte-identical from the stated composition_artifact has a conformant implementation. composition_ref commits to the complete authorization lifecycle: delegation_ref (who authorized), dual-timestamps (authority_verified_at_ms + revocation_check_at_ms), revocation_ref (subsequent invalidation), and the action_ref that ties all four to a specific agent action.",
+  "reproduce_in_python": "import hashlib, json\ndef jcs(obj): return json.dumps(obj, separators=(',',':'), sort_keys=True, ensure_ascii=False)\ncomposition_ref = hashlib.sha256(jcs(composition_artifact).encode()).hexdigest()",
+  "vectors": [
+    {
+      "id": "composition-001-full-lifecycle",
+      "description": "Complete authorization lifecycle: pioneer-agent-001 executes payment.send under a delegation from giskard-self (delegation_ref). Authority was verified at T-10s and revocation was confirmed absent at T-5s before execution (dual-timestamps). The delegation was subsequently revoked (revocation_ref non-null). composition_ref commits to all four primitives as a single verifiable unit.",
+      "composition_artifact": {
+        "action_ref":               "584bc79bb11ce3af5058b3da84d03f85e4aa464a175bd4f913aeb82a22cef60f",
+        "authority_verified_at_ms":  1748087390000,
+        "composition_key":           "comp_7a2f9c3b1d4e",
+        "delegation_ref":            "69e672d1ba7484e3620d4d4ed9b366c4d4c8b203c4176f60f000e2b793761ffb",
+        "revocation_check_at_ms":    1748087395000,
+        "revocation_ref":            "50cb4f3d564763cd11dde45950ef8298e92f468070a27f125dfd658d45d5eca5",
+        "scope":                     "mycelium:payment",
+        "version":                   "composition-ref-v1"
+      },
+      "artifact_jcs_payload": "{\"action_ref\":\"584bc79bb11ce3af5058b3da84d03f85e4aa464a175bd4f913aeb82a22cef60f\",\"authority_verified_at_ms\":1748087390000,\"composition_key\":\"comp_7a2f9c3b1d4e\",\"delegation_ref\":\"69e672d1ba7484e3620d4d4ed9b366c4d4c8b203c4176f60f000e2b793761ffb\",\"revocation_check_at_ms\":1748087395000,\"revocation_ref\":\"50cb4f3d564763cd11dde45950ef8298e92f468070a27f125dfd658d45d5eca5\",\"scope\":\"mycelium:payment\",\"version\":\"composition-ref-v1\"}",
+      "artifact_canonical_bytes_hex": "7b22616374696f6e5f726566223a2235383462633739626231316365336166353035386233646138346430336638356534616134363461313735626434663931336165623832613232636566363066222c22617574686f726974795f76657269666965645f61745f6d73223a313734383038373339303030302c22636f6d706f736974696f6e5f6b6579223a22636f6d705f376132663963336231643465222c2264656c65676174696f6e5f726566223a2236396536373264316261373438346533363230643464346564396233363663346434633862323033633431373666363066303030653262373933373631666662222c227265766f636174696f6e5f636865636b5f61745f6d73223a313734383038373339353030302c227265766f636174696f6e5f726566223a2235306362346633643536343736336364313164646534353935306566383239386539326634363830373061323766313235646664363538643435643565636135222c2273636f7065223a226d7963656c69756d3a7061796d656e74222c2276657273696f6e223a22636f6d706f736974696f6e2d7265662d7631227d",
+      "composition_ref": "234f0664ee1912cf210824112598639aca00edcf734221016cc04bb3da158e2a",
+      "action_preimage": {
+        "action_type": "payment.send",
+        "agent_id":    "pioneer-agent-001",
+        "scope":       "mycelium:payment",
+        "timestamp":   "2026-05-24T10:30:00.000Z"
+      },
+      "action_ref": "584bc79bb11ce3af5058b3da84d03f85e4aa464a175bd4f913aeb82a22cef60f",
+      "dual_timestamp_window": {
+        "authority_verified_at_ms":  1748087390000,
+        "revocation_check_at_ms":    1748087395000,
+        "action_timestamp":          "2026-05-24T10:30:00.000Z",
+        "action_timestamp_ms":       1748087400000,
+        "constraint":                "authority_verified_at_ms <= revocation_check_at_ms <= action_timestamp_ms"
+      },
+      "envelope": {
+        "action_ref":      "584bc79bb11ce3af5058b3da84d03f85e4aa464a175bd4f913aeb82a22cef60f",
+        "composition_ref": "234f0664ee1912cf210824112598639aca00edcf734221016cc04bb3da158e2a",
+        "delegation_ref":  "69e672d1ba7484e3620d4d4ed9b366c4d4c8b203c4176f60f000e2b793761ffb",
+        "hash_algo":       "sha256",
+        "packet_version":  "1.0",
+        "preimage": {
+          "action_type": "payment.send",
+          "agent_id":    "pioneer-agent-001",
+          "scope":       "mycelium:payment",
+          "timestamp":   "2026-05-24T10:30:00.000Z"
+        },
+        "preimage_format": "jcs-rfc8785-v1",
+        "revocation_ref":  "50cb4f3d564763cd11dde45950ef8298e92f468070a27f125dfd658d45d5eca5",
+        "trail_status":    "COMMITTED",
+        "tx_hash":         "0x7fd0a8ededd1feb65ab37b3324218a0386dbf124174cf122bffc40717c057b84"
+      },
+      "envelope_canonical_sha256": "dc93f687b883d25a531a817e48e13d9a01a49eb4a9a1133ac1c1370c6a872c0a",
+      "envelope_canonical_bytes_hex": "7b22616374696f6e5f726566223a2235383462633739626231316365336166353035386233646138346430336638356534616134363461313735626434663931336165623832613232636566363066222c22636f6d706f736974696f6e5f726566223a2232333466303636346565313931326366323130383234313132353938363339616361303065646366373334323231303136636330346262336461313538653261222c2264656c65676174696f6e5f726566223a2236396536373264316261373438346533363230643464346564396233363663346434633862323033633431373666363066303030653262373933373631666662222c22686173685f616c676f223a22736861323536222c227061636b65745f76657273696f6e223a22312e30222c22707265696d616765223a7b22616374696f6e5f74797065223a227061796d656e742e73656e64222c226167656e745f6964223a2270696f6e6565722d6167656e742d303031222c2273636f7065223a226d7963656c69756d3a7061796d656e74222c2274696d657374616d70223a22323032362d30352d32345431303a33303a30302e3030305a227d2c22707265696d6167655f666f726d6174223a226a63732d726663383738352d7631222c227265766f636174696f6e5f726566223a2235306362346633643536343736336364313164646534353935306566383239386539326634363830373061323766313235646664363538643435643565636135222c22747261696c5f737461747573223a22434f4d4d4954544544222c2274785f68617368223a22307837666430613865646564643166656236356162333762333332343231386130333836646266313234313734636631323262666663343037313763303537623834227d",
+      "invariants": {
+        "composition_ref_not_in_preimage": "composition_ref does not appear in action_preimage — action_ref is determined solely by action_type, agent_id, scope, timestamp",
+        "independent_hashes": "composition_ref = SHA-256(JCS(composition_artifact)); action_ref = SHA-256(JCS(action_preimage)); neither hash is derived from the other",
+        "delegates_not_replaced": "delegation_ref and revocation_ref remain present in envelope independently; composition_ref is additive",
+        "scope_consistent": "scope in composition_artifact matches scope in action_preimage and delegation_artifact and revocation_artifact"
+      },
+      "notes": {
+        "delegation_ref": "Cross-references delegation-ref-v1.fixture.json vector delegation-001 — same artifact, same hash.",
+        "revocation_ref": "Cross-references revocation-ref-v1.fixture.json vector revocation-001 — same artifact, same hash.",
+        "dual_timestamps": "authority_verified_at_ms (T-10s) and revocation_check_at_ms (T-5s) close the audit gap between delegation validity check and action execution.",
+        "revocation_ref_non_null": "This vector demonstrates post-execution revocation — the action was valid when executed; the delegation became invalid afterward. composition_ref captures this full timeline.",
+        "tx_hash": "Real Base mainnet anchor (pioneer-agent-001 Oasis payment 2026-04-13). Shared canonical reference across fixtures."
+      }
+    }
+  ]
+}
