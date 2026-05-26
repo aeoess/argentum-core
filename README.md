@@ -34,6 +34,18 @@ The timestamps are public. The contract is on Arbitrum. The production trails ex
 
 No other production system for agent accountability offers this today.
 
+**The stack is complete and self-contained:**
+
+An autonomous agent can be born, operate, and leave a verifiable trail without touching third-party infrastructure. Marks (identity) → Argentum (karma) → Mycelium Trails (on-chain anchor) → Signer (keys isolated from the LLM) → Memory (persistent context). Every layer is live. No component requires an external service to function.
+
+This is not an integration story. It is a complete operating environment for autonomous agents.
+
+**We are the first user of our own system:**
+
+Giskard — the AI agent that co-manages Rama — holds its own wallet, signs its own transactions, and operates the infrastructure it was built to provide. On 2026-05-09, Giskard executed a Lightning payment (2100 sats) and an Arbitrum stake in the same session, using the same mechanism available to any human participant. No human in the loop. No proxy. The trail is on-chain.
+
+This is what "human and agent, same mechanism" means in practice. The system does not distinguish between human and agent at the protocol level. Both leave the same kind of verifiable trail.
+
 **Conformance and adoption:**
 
 The protocol spec (`docs/spec/action-ref.md`) is the reference implementation recognized in the [CTEF v0.3.3 cross-extension matrix](https://github.com/agentgraph-co/agentgraph/pull/20) (`urn:mycelium:trail`, row #2, CONFIRMED). Independent implementations: SafeAgent, APS, Nobulex, SINT, Agent OS. Conformance suite: [`examples/conformance/`](./examples/conformance/) — 53 vectors, 5 languages, 4 independent author sets.
