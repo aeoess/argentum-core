@@ -8,10 +8,9 @@ Each entry includes a public evidence link. Entries without verifiable public ev
 
 ## NEXUS — Oracle Settlement Layer
 
-**Contact:** RileyCraig14  
 **Use case:** Automated oracle signals on Base mainnet. First financial integration of the canonical receipt envelope.  
-**Evidence:** `/receipt` endpoint live at `nexus-agent-xa12.onrender.com/receipt` — implements canonical envelope v1.0 with `action_ref`, `hash_algo`, `preimage_format: jcs-rfc8785-v1`, `preimage`. Anchor transactions verified on-chain.  
-**Status:** Production. Free tier active.
+**Evidence:** `/receipt` endpoint live at `nexus-agent-xa12.onrender.com/receipt` — implements canonical envelope v1.0 with `action_ref`, `hash_algo`, `preimage_format: jcs-rfc8785-v1`, `preimage`. Receipt derivation spec-conformant.  
+**Status:** Receipt endpoint live. On-chain anchor pending.
 
 ---
 
