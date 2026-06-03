@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel
 from pathlib import Path
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -1453,6 +1453,242 @@ async def proxy_trails_demo(limit: int = 10):
     async with httpx.AsyncClient(timeout=10) as c:
         r = await c.get(f"http://localhost:8003/trails/demo", params={"limit": limit})
         return r.json()
+
+
+_FINSERV_DEMO = {
+    "agent_id":    "fca-compliance-agent",
+    "action_type": "trade.execute",
+    "scope":       "trade:execute:authorized",
+    "timestamp":   "2026-06-03T09:00:00.000Z",
+    "action_ref":  "5df319397e75ba2e031ccf0789beb0e5e04ee5bea396a5840455c997072bc86a",
+    "tx_hash":     "0x80f3aebf4b24f19eadb7fb80887d03b82bfd2e0b9473ff16ae46d0d72139ebf6",
+    "block":       469669261,
+    "service":     "mycelium.finserv-demo",
+}
+_finserv_trail_id_cache: list = []
+
+def _get_or_create_finserv_trail() -> str:
+    if _finserv_trail_id_cache:
+        return _finserv_trail_id_cache[0]
+    conn = mycelium_trails._connect(TRAILS_DB)
+    row = conn.execute(
+        "SELECT trail_id FROM trails WHERE service = ? LIMIT 1",
+        (_FINSERV_DEMO["service"],),
+    ).fetchone()
+    conn.close()
+    if row:
+        _finserv_trail_id_cache.append(row[0])
+        return row[0]
+    trail_id = mycelium_trails.record_trail(
+        TRAILS_DB,
+        agent_id=_FINSERV_DEMO["agent_id"],
+        service=_FINSERV_DEMO["service"],
+        operation=_FINSERV_DEMO["action_type"],
+        nonce=_FINSERV_DEMO["action_ref"],
+        karma_at_time=None,
+        success=True,
+        rate_limit_cap=0,
+        scope=_FINSERV_DEMO["scope"],
+    )
+    if trail_id:
+        conn2 = mycelium_trails._connect(TRAILS_DB)
+        conn2.execute(
+            "UPDATE trails SET tx_hash = ? WHERE trail_id = ?",
+            (_FINSERV_DEMO["tx_hash"], trail_id),
+        )
+        conn2.close()
+        _finserv_trail_id_cache.append(trail_id)
+    return trail_id or "demo"
+
+
+@app.get("/trails/finserv-demo", response_class=HTMLResponse)
+def finserv_demo():
+    """Pre-generated MiFID II / FCA SYSC 9.1 compliance trail — enterprise demo."""
+    trail_id = _get_or_create_finserv_trail()
+    d = _FINSERV_DEMO
+    arbiscan = f"https://arbiscan.io/tx/{d['tx_hash']}"
+    verify_url = f"https://argentum-api.rgiskard.xyz/trails/verify?agent_id={d['agent_id']}&action_ref={d['action_ref']}"
+    canonical_payload = '{"action_type":"trade.execute","agent_id":"fca-compliance-agent","scope":"trade:execute:authorized","timestamp":"2026-06-03T09:00:00.000Z"}'
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mycelium Trails — Finserv Compliance Demo</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Inter',system-ui,sans-serif;background:#0a0e1a;color:#e2e8f0;line-height:1.6}}
+  .header{{background:linear-gradient(135deg,#1a2744 0%,#0d1f3c 100%);border-bottom:1px solid #2d4a7a;padding:32px 48px}}
+  .header h1{{font-size:1.5rem;font-weight:700;color:#93c5fd;letter-spacing:.02em}}
+  .header p{{color:#94a3b8;margin-top:6px;font-size:.95rem}}
+  .badge{{display:inline-flex;align-items:center;gap:6px;background:#064e3b;color:#6ee7b7;font-size:.75rem;font-weight:600;padding:3px 10px;border-radius:9999px;border:1px solid #065f46;margin-top:12px}}
+  .badge.anchor{{background:#1e3a5f;color:#93c5fd;border-color:#2563eb}}
+  .container{{max-width:900px;margin:0 auto;padding:40px 32px}}
+  .section{{background:#111827;border:1px solid #1f2d45;border-radius:12px;padding:28px;margin-bottom:24px}}
+  .section h2{{font-size:1rem;font-weight:600;color:#60a5fa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:18px;display:flex;align-items:center;gap:8px}}
+  .kv{{display:grid;grid-template-columns:200px 1fr;gap:8px 16px;align-items:start}}
+  .kv .key{{color:#64748b;font-size:.85rem;font-weight:500;padding-top:2px}}
+  .kv .val{{color:#e2e8f0;font-size:.875rem;font-family:'JetBrains Mono','Fira Code',monospace;word-break:break-all}}
+  .kv .val.highlight{{color:#34d399;background:#052e16;padding:3px 8px;border-radius:4px;border:1px solid #065f46}}
+  .kv .val.dim{{color:#94a3b8}}
+  .code{{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:16px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.8rem;color:#c9d1d9;overflow-x:auto;margin-top:8px}}
+  .compliance-table{{width:100%;border-collapse:collapse;font-size:.875rem}}
+  .compliance-table th{{background:#1e293b;color:#94a3b8;font-weight:600;text-align:left;padding:10px 14px;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}}
+  .compliance-table td{{padding:10px 14px;border-bottom:1px solid #1f2d45;vertical-align:top}}
+  .compliance-table tr:last-child td{{border-bottom:none}}
+  .compliance-table .rule{{color:#93c5fd;font-family:monospace;font-size:.8rem}}
+  .compliance-table .status{{color:#34d399;font-weight:600}}
+  .link{{color:#60a5fa;text-decoration:none;font-size:.8rem}}
+  .link:hover{{text-decoration:underline}}
+  .footer{{text-align:center;color:#374151;font-size:.8rem;padding:32px;border-top:1px solid #1f2d45;margin-top:8px}}
+  .pill{{display:inline-flex;align-items:center;gap:4px;font-size:.75rem;font-weight:500;padding:2px 8px;border-radius:4px}}
+  .pill.success{{background:#052e16;color:#34d399;border:1px solid #065f46}}
+  .pill.anchored{{background:#1e3a5f;color:#93c5fd;border:1px solid #1d4ed8}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Mycelium Trails — Regulatory Evidence Layer</h1>
+  <p>Pre-generated compliance trail · MiFID II Art. 25 · FCA SYSC 9.1.1R · Independently verifiable</p>
+  <span class="badge">&#10003; Trail anchored on Arbitrum One</span>
+  &nbsp;
+  <span class="badge anchor">&#128274; action_ref · SHA-256 canonical</span>
+</div>
+
+<div class="container">
+
+  <div class="section">
+    <h2>&#128196; Scenario</h2>
+    <p style="color:#94a3b8;font-size:.9rem;margin-bottom:18px">
+      An AI trading agent executes a equity order under MiFID II best-execution obligation
+      and FCA SYSC 9.1 record-keeping requirements. The action is content-addressed —
+      any party with the four preimage fields can independently verify the receipt without
+      trusting the emitting system.
+    </p>
+    <div class="kv">
+      <span class="key">Trail ID</span>
+      <span class="val dim">{trail_id}</span>
+      <span class="key">Status</span>
+      <span class="val"><span class="pill success">&#10003; executed</span></span>
+      <span class="key">Executed at</span>
+      <span class="val">{d["timestamp"]} &nbsp;<span style="color:#64748b;font-size:.8rem">(market open, UTC)</span></span>
+      <span class="key">Agent</span>
+      <span class="val">{d["agent_id"]}</span>
+      <span class="key">Operation</span>
+      <span class="val">{d["action_type"]}</span>
+      <span class="key">Scope</span>
+      <span class="val">{d["scope"]}</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>&#128274; Canonical action_ref</h2>
+    <p style="color:#64748b;font-size:.85rem;margin-bottom:14px">
+      SHA-256 of the JCS-canonicalized preimage (RFC 8785). Deterministic — same four inputs
+      always produce the same digest. No trust in Mycelium required to verify.
+    </p>
+    <div class="kv">
+      <span class="key">action_ref</span>
+      <span class="val highlight">{d["action_ref"]}</span>
+      <span class="key">Preimage</span>
+      <span class="val dim">agent_id · action_type · scope · timestamp (lexicographic JCS)</span>
+    </div>
+    <div class="code"># Reproduce independently
+import hashlib, json
+
+preimage = {{
+    "agent_id":    "{d['agent_id']}",
+    "action_type": "{d['action_type']}",
+    "scope":       "{d['scope']}",
+    "timestamp":   "{d['timestamp']}",
+}}
+canonical = json.dumps(dict(sorted(preimage.items())), separators=(",",":")).encode()
+action_ref = hashlib.sha256(canonical).hexdigest()
+# → {d["action_ref"]}
+
+# JCS payload:
+# {canonical_payload}</div>
+  </div>
+
+  <div class="section">
+    <h2>&#9935; On-chain anchor · Arbitrum One</h2>
+    <p style="color:#64748b;font-size:.85rem;margin-bottom:14px">
+      The action_ref is anchored on Arbitrum One. The transaction timestamp provides
+      a tamper-evident lower bound: the action was registered no later than block {d["block"]}.
+    </p>
+    <div class="kv">
+      <span class="key">Network</span>
+      <span class="val">Arbitrum One (Chain ID 42161)</span>
+      <span class="key">Block</span>
+      <span class="val">{d["block"]:,}</span>
+      <span class="key">Transaction</span>
+      <span class="val"><a class="link" href="{arbiscan}" target="_blank">{d["tx_hash"][:20]}…{d["tx_hash"][-8:]} ↗</a></span>
+      <span class="key">Wallet</span>
+      <span class="val dim">0xDcc84E979…83DBF4 (Mycelium operator)</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>&#9989; Independent verification</h2>
+    <div class="kv">
+      <span class="key">Verify endpoint</span>
+      <span class="val"><a class="link" href="{verify_url}" target="_blank">argentum-api.rgiskard.xyz/trails/verify ↗</a></span>
+      <span class="key">On-chain</span>
+      <span class="val"><a class="link" href="{arbiscan}" target="_blank">arbiscan.io ↗</a></span>
+      <span class="key">Spec</span>
+      <span class="val"><a class="link" href="https://github.com/giskard09/argentum-core/blob/main/docs/spec/action-ref.md" target="_blank">action-ref.md v1.1 ↗</a></span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>&#9878; Regulatory mapping</h2>
+    <table class="compliance-table">
+      <thead>
+        <tr><th>Regulation</th><th>Requirement</th><th>How action_ref satisfies it</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="rule">MiFID II Art. 25(1)</td>
+          <td>Record of investment services — sufficient information to reconstruct each order</td>
+          <td>action_ref + preimage fields (agent, operation, scope, timestamp) provide a tamper-evident, independently replayable record of each agent action</td>
+          <td class="status">&#10003; Satisfied</td>
+        </tr>
+        <tr>
+          <td class="rule">FCA SYSC 9.1.1R</td>
+          <td>Orderly record-keeping — records must be retained and retrievable</td>
+          <td>Trail persisted in Mycelium with public verify endpoint; on-chain anchor provides long-term tamper evidence independent of operator availability</td>
+          <td class="status">&#10003; Satisfied</td>
+        </tr>
+        <tr>
+          <td class="rule">FCA SYSC 9.1.2G</td>
+          <td>Records sufficient to demonstrate compliance to regulators</td>
+          <td>Canonical receipt envelope v1.0 includes hash_algo, preimage_format, and all four preimage fields — complete audit package exportable to supervisor on demand</td>
+          <td class="status">&#10003; Satisfied</td>
+        </tr>
+        <tr>
+          <td class="rule">EU AI Act Art. 12</td>
+          <td>Logging obligations for high-risk AI — traceability of automated decisions</td>
+          <td>Each trail record links agent_id (executor), action_type (decision class), scope (authorization boundary), and timestamp — satisfies traceability for high-risk classification</td>
+          <td class="status">&#10003; Satisfied</td>
+        </tr>
+        <tr>
+          <td class="rule">Basel III / BCBS 239</td>
+          <td>Data lineage and auditability for risk reporting</td>
+          <td>action_ref as content-addressed linking key enables cross-system lineage: same receipt verifiable in Mycelium, on-chain, and any downstream risk system that embeds the preimage</td>
+          <td class="status">&#10003; Satisfied</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+<div class="footer">
+  Mycelium Trails · <a class="link" href="https://argentum.rgiskard.xyz">argentum.rgiskard.xyz</a> ·
+  <a class="link" href="https://github.com/giskard09/argentum-core">github.com/giskard09/argentum-core</a>
+</div>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 @app.get("/trails/agents/{agent_id}")
