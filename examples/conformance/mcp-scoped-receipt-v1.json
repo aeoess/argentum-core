@@ -1,0 +1,70 @@
+{
+  "fixture_id": "mcp-scoped-receipt-v1",
+  "version": "v1",
+  "spec": [
+    "docs/spec/action-ref.md"
+  ],
+  "hash_algo": "sha256",
+  "preimage_format": "jcs-rfc8785-v1",
+  "generated_at": "2026-06-03",
+  "purpose": "action_ref as shared audit handle for MCP tool calls. Demonstrates independent operator-agnostic verification: any party holding the four preimage fields can recompute the handle without trusting the emitting system or calling signed_or_introspected. The preimage fields map directly to the bind_receipt_to tuple (agent_id, action_type, scope, timestamp). Vector 3 is a negative example: hashed scope breaks independent recomputability — the verifier cannot recover the pre-hash value without the commitment record.",
+  "reproduce_in_python": "import hashlib, json\ndef jcs(obj): return json.dumps(obj, separators=(',',':'), sort_keys=True, ensure_ascii=False)\naction_ref = hashlib.sha256(jcs(preimage).encode()).hexdigest()",
+  "vectors": [
+    {
+      "id": "mcp-01-filesystem-read",
+      "description": "MCP tool call — agent requests filesystem read under session scope. action_ref is the shared audit handle: client, server, and any third-party auditor can recompute it from the four preimage fields alone, without querying the MCP server or verifying a signature.",
+      "bind_receipt_to_mapping": {
+        "agent_id": "executing agent at issuance time — terminal executor after full delegation resolution",
+        "action_type": "MCP method or tool name as semantic label",
+        "scope": "requested-intent scope — what the agent requested at the point of the call",
+        "timestamp": "RFC 3339 UTC with 3-digit ms precision — issuance time, not server-admission time"
+      },
+      "preimage": {
+        "action_type": "tool.call",
+        "agent_id": "mcp-client-agent",
+        "scope": "mcp:filesystem:read",
+        "timestamp": "2026-06-03T12:00:00.000Z"
+      },
+      "jcs_payload": "{\"action_type\":\"tool.call\",\"agent_id\":\"mcp-client-agent\",\"scope\":\"mcp:filesystem:read\",\"timestamp\":\"2026-06-03T12:00:00.000Z\"}",
+      "canonical_bytes_hex": "7b22616374696f6e5f74797065223a22746f6f6c2e63616c6c222c226167656e745f6964223a226d63702d636c69656e742d6167656e74222c2273636f7065223a226d63703a66696c6573797374656d3a72656164222c2274696d657374616d70223a22323032362d30362d30335431323a30303a30302e3030305a227d",
+      "action_ref": "5aff61c81fd5ad2887fde31c9aaab8081a234396c807ba9f31fff25d22762def"
+    },
+    {
+      "id": "mcp-02-github-write-delegated",
+      "description": "MCP tool call with delegation — orchestrator delegates to subagent, subagent executes. agent_id is the terminal executor (subagent-executor), not the orchestrator. The orchestrator's identity belongs in delegation_ref, not in the action_ref preimage. This is the key distinction from signed_or_introspected: the audit handle is anchored to who executed, independently verifiable.",
+      "bind_receipt_to_mapping": {
+        "agent_id": "subagent-executor — terminal executor, not the orchestrator that delegated",
+        "action_type": "tool.call",
+        "scope": "mcp:github:write — requested-intent at point of action",
+        "timestamp": "2026-06-03T12:01:00.000Z"
+      },
+      "preimage": {
+        "action_type": "tool.call",
+        "agent_id": "subagent-executor",
+        "scope": "mcp:github:write",
+        "timestamp": "2026-06-03T12:01:00.000Z"
+      },
+      "jcs_payload": "{\"action_type\":\"tool.call\",\"agent_id\":\"subagent-executor\",\"scope\":\"mcp:github:write\",\"timestamp\":\"2026-06-03T12:01:00.000Z\"}",
+      "canonical_bytes_hex": "7b22616374696f6e5f74797065223a22746f6f6c2e63616c6c222c226167656e745f6964223a227375626167656e742d6578656375746f72222c2273636f7065223a226d63703a6769746875623a7772697465222c2274696d657374616d70223a22323032362d30362d30335431323a30313a30302e3030305a227d",
+      "action_ref": "30dcd6acba08bcb0ced6101f44eaaa87aae403a67b9bded834081da8a972e86f"
+    },
+    {
+      "id": "mcp-03-negative-hashed-scope",
+      "description": "NEGATIVE EXAMPLE — scope is SHA-256 of the intent document instead of the intent label. This breaks the primary property: a verifier holding the four preimage fields cannot recompute action_ref without also retrieving the commitment record to recover the pre-hash value. The resulting action_ref is technically valid (bytes hash correctly) but is not a shared audit handle — it is an operator-bound receipt. Compare with mcp-01: same agent, same action_type, same timestamp, different scope encoding produces a different action_ref that an external auditor cannot independently derive.",
+      "anti_pattern": "scope = SHA-256(intent_document) instead of the intent label string",
+      "consequence": "verifier must retrieve commitment record to recompute — breaks operator-independent auditability",
+      "intent_document": "{\"intent\":\"read all files\"}",
+      "intent_document_sha256": "3f4b7ae5c55cfaed0694310975cf9045138a8314254e0e51e35f5052ee9abaa7",
+      "preimage": {
+        "action_type": "tool.call",
+        "agent_id": "mcp-client-agent",
+        "scope": "3f4b7ae5c55cfaed0694310975cf9045138a8314254e0e51e35f5052ee9abaa7",
+        "timestamp": "2026-06-03T12:00:00.000Z"
+      },
+      "jcs_payload": "{\"action_type\":\"tool.call\",\"agent_id\":\"mcp-client-agent\",\"scope\":\"3f4b7ae5c55cfaed0694310975cf9045138a8314254e0e51e35f5052ee9abaa7\",\"timestamp\":\"2026-06-03T12:00:00.000Z\"}",
+      "canonical_bytes_hex": "7b22616374696f6e5f74797065223a22746f6f6c2e63616c6c222c226167656e745f6964223a226d63702d636c69656e742d6167656e74222c2273636f7065223a2233663462376165356335356366616564303639343331303937356366393034353133386138333134323534653065353165333566353035326565396162616137222c2274696d657374616d70223a22323032362d30362d30335431323a30303a30302e3030305a227d",
+      "action_ref": "9636410f1e686c31500d764e37e7dbb11a46ff346747b3308c995d00219fbd3c",
+      "note": "action_ref differs from mcp-01 despite identical agent_id, action_type, and timestamp. An auditor given only the four preimage fields from the commitment record computes 9636410f... but cannot verify it matches the original intent without the pre-hash value."
+    }
+  ]
+}
