@@ -15,13 +15,14 @@ Ver ~/Downloads/CODIGO - MYCELIUM TRAILS.txt para diseno completo.
 """
 import datetime
 import hashlib
+import os
 import sqlite3
 import time
 import uuid
 from typing import Iterable, Optional
 
 GENESIS_AGENTS_DEFAULT = frozenset({"giskard-self", "lightning"})
-RATE_LIMIT_DEFAULT = 100
+RATE_LIMIT_DEFAULT = int(os.environ.get("TRAIL_DAILY_LIMIT", "100"))
 MAX_LIMIT_PER_QUERY = 500
 MONTHLY_LIMIT_FREE = 1000
 SATS_PER_TRAIL = 300  # 300 sats ≈ $0.003 al precio actual
@@ -90,6 +91,7 @@ _DDL_MIGRATIONS = [
     "ALTER TABLE trails ADD COLUMN parent_trail_id TEXT",
     "ALTER TABLE trails ADD COLUMN root_trail_id TEXT",
     "ALTER TABLE trails ADD COLUMN negotiation_ref TEXT",
+    "ALTER TABLE trails ADD COLUMN action_ref TEXT",
 ]
 
 
@@ -224,6 +226,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
         "parent_trail_id": row["parent_trail_id"] if "parent_trail_id" in keys else None,
         "root_trail_id": row["root_trail_id"] if "root_trail_id" in keys else None,
         "negotiation_ref": row["negotiation_ref"] if "negotiation_ref" in keys else None,
+        "action_ref": row["action_ref"] if "action_ref" in keys else None,
     }
 
 

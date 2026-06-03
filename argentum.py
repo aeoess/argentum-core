@@ -1691,6 +1691,132 @@ action_ref = hashlib.sha256(canonical).hexdigest()
     return HTMLResponse(content=html)
 
 
+@app.get("/dashboard/trails", response_class=HTMLResponse)
+def trails_dashboard(client: Optional[str] = None, limit: int = 50):
+    """Live trails dashboard — consultable por cliente. Sin push."""
+    conn = mycelium_trails._connect(TRAILS_DB)
+    if client:
+        rows = conn.execute(
+            "SELECT trail_id, agent_id, service, operation, scope, timestamp, action_ref, success "
+            "FROM trails WHERE agent_id = ? OR service = ? "
+            "ORDER BY timestamp DESC LIMIT ?",
+            (client, client, min(limit, 200)),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT trail_id, agent_id, service, operation, scope, timestamp, action_ref, success "
+            "FROM trails ORDER BY timestamp DESC LIMIT ?",
+            (min(limit, 200),),
+        ).fetchall()
+    conn.close()
+
+    import datetime as _dt
+    def fmt_ts(ts):
+        try:
+            return _dt.datetime.fromtimestamp(int(ts), tz=_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        except Exception:
+            return str(ts)
+
+    rows_html = ""
+    for r in rows:
+        action_ref_val = r["action_ref"] or "—"
+        action_ref_short = (action_ref_val[:12] + "…") if r["action_ref"] else "—"
+        action_ref_title = action_ref_val if r["action_ref"] else ""
+        success_badge = '<span class="ok">✓</span>' if r["success"] else '<span class="fail">✗</span>'
+        rows_html += f"""<tr>
+          <td class="mono dim">{(r["trail_id"] or "")[:8]}</td>
+          <td>{r["agent_id"] or ""}</td>
+          <td class="dim">{r["service"] or ""}</td>
+          <td>{r["operation"] or ""}</td>
+          <td class="dim">{r["scope"] or "—"}</td>
+          <td class="mono dim" title="{action_ref_title}">{action_ref_short}</td>
+          <td class="ts">{fmt_ts(r["timestamp"])}</td>
+          <td>{success_badge}</td>
+        </tr>"""
+
+    client_filter_note = f" — <span class='filter'>client: {client}</span>" if client else ""
+    total = len(rows)
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mycelium Trails — Live Dashboard</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Inter',system-ui,sans-serif;background:#0a0e1a;color:#e2e8f0;font-size:.875rem}}
+  .header{{background:#0d1f3c;border-bottom:1px solid #1f3a6e;padding:20px 32px;display:flex;align-items:center;justify-content:space-between}}
+  .header h1{{font-size:1rem;font-weight:600;color:#93c5fd;letter-spacing:.02em}}
+  .header .meta{{color:#64748b;font-size:.8rem}}
+  .filter{{color:#60a5fa}}
+  .toolbar{{padding:16px 32px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #1a2744}}
+  .toolbar input{{background:#111827;border:1px solid #1f2d45;color:#e2e8f0;padding:6px 12px;border-radius:6px;font-size:.8rem;width:220px}}
+  .toolbar input::placeholder{{color:#475569}}
+  .toolbar button{{background:#1d4ed8;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:.8rem;cursor:pointer}}
+  .toolbar button:hover{{background:#2563eb}}
+  .toolbar .count{{color:#64748b;font-size:.8rem;margin-left:auto}}
+  .refresh{{color:#64748b;font-size:.75rem}}
+  .wrap{{padding:0 32px 32px}}
+  table{{width:100%;border-collapse:collapse;margin-top:16px}}
+  th{{background:#0d1f3c;color:#64748b;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:10px 12px;text-align:left;position:sticky;top:0}}
+  td{{padding:9px 12px;border-bottom:1px solid #111827;vertical-align:middle}}
+  tr:hover td{{background:#0d1a2e}}
+  .mono{{font-family:'JetBrains Mono','Fira Code',monospace;font-size:.8rem}}
+  .dim{{color:#94a3b8}}
+  .ts{{color:#64748b;font-size:.78rem}}
+  .ok{{color:#34d399;font-weight:700}}
+  .fail{{color:#f87171;font-weight:700}}
+  .empty{{text-align:center;color:#475569;padding:48px;font-size:.85rem}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Mycelium Trails — Live Dashboard{client_filter_note}</h1>
+  <span class="meta" id="last-refresh">Last refresh: {_dt.datetime.now(_dt.timezone.utc).strftime("%H:%M:%S UTC")}</span>
+</div>
+<div class="toolbar">
+  <input id="filter-input" type="text" placeholder="Filter by client / agent_id…" value="{client or ''}">
+  <button onclick="applyFilter()">Filter</button>
+  <span class="count">{total} trail{'s' if total != 1 else ''}</span>
+  <span class="refresh">Auto-refresh: 30s</span>
+</div>
+<div class="wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Trail ID</th>
+      <th>Agent / Client</th>
+      <th>Service</th>
+      <th>Action Type</th>
+      <th>Scope</th>
+      <th>action_ref</th>
+      <th>Timestamp</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {"" if rows_html else '<tr><td colspan="8" class="empty">No trails found.</td></tr>'}
+    {rows_html}
+  </tbody>
+</table>
+</div>
+<script>
+function applyFilter() {{
+  const v = document.getElementById('filter-input').value.trim();
+  window.location.href = '/dashboard/trails' + (v ? '?client=' + encodeURIComponent(v) : '');
+}}
+document.getElementById('filter-input').addEventListener('keydown', e => {{
+  if (e.key === 'Enter') applyFilter();
+}});
+// Auto-refresh every 30s
+setTimeout(() => window.location.reload(), 30000);
+</script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
 @app.get("/trails/agents/{agent_id}")
 async def proxy_trails_by_agent(agent_id: str, limit: int = 50):
     """Proxy a Giskard Oasis /trails/{agent_id} — historial de trails por agente."""
@@ -2250,6 +2376,11 @@ async def nexus_trail(request: Request):
         negotiation_ref=negotiation_ref,
         skip_monthly_limit=payg_consumed,
     )
+
+    if trail_id:
+        _conn = mycelium_trails._connect(TRAILS_DB)
+        _conn.execute("UPDATE trails SET action_ref = ? WHERE trail_id = ?", (action_ref, trail_id))
+        _conn.close()
 
     if trail_id is None:
         if payg_consumed:
