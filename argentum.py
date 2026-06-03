@@ -9,6 +9,7 @@ The faith is not measurable. The action is.
 """
 
 import asyncio
+import html as _html
 import json, uuid, time, httpx, sqlite3, hmac, hashlib, os
 _started_at = time.time()
 import mycelium_trails
@@ -1717,24 +1718,27 @@ def trails_dashboard(client: Optional[str] = None, limit: int = 50):
         except Exception:
             return str(ts)
 
+    def e(v, quote=False): return _html.escape(str(v) if v else "", quote=quote)
+
     rows_html = ""
     for r in rows:
-        action_ref_val = r["action_ref"] or "—"
-        action_ref_short = (action_ref_val[:12] + "…") if r["action_ref"] else "—"
-        action_ref_title = action_ref_val if r["action_ref"] else ""
+        action_ref_val = r["action_ref"] or ""
+        action_ref_short = (action_ref_val[:12] + "…") if action_ref_val else "—"
+        action_ref_title = e(action_ref_val, quote=True)
         success_badge = '<span class="ok">✓</span>' if r["success"] else '<span class="fail">✗</span>'
         rows_html += f"""<tr>
-          <td class="mono dim">{(r["trail_id"] or "")[:8]}</td>
-          <td>{r["agent_id"] or ""}</td>
-          <td class="dim">{r["service"] or ""}</td>
-          <td>{r["operation"] or ""}</td>
-          <td class="dim">{r["scope"] or "—"}</td>
-          <td class="mono dim" title="{action_ref_title}">{action_ref_short}</td>
-          <td class="ts">{fmt_ts(r["timestamp"])}</td>
+          <td class="mono dim">{e(r["trail_id"] or "")[:8]}</td>
+          <td>{e(r["agent_id"])}</td>
+          <td class="dim">{e(r["service"])}</td>
+          <td>{e(r["operation"])}</td>
+          <td class="dim">{e(r["scope"]) or "—"}</td>
+          <td class="mono dim" title="{action_ref_title}">{e(action_ref_short)}</td>
+          <td class="ts">{e(fmt_ts(r["timestamp"]))}</td>
           <td>{success_badge}</td>
         </tr>"""
 
-    client_filter_note = f" — <span class='filter'>client: {client}</span>" if client else ""
+    safe_client = e(client or "", quote=True)
+    client_filter_note = f" — <span class='filter'>client: {safe_client}</span>" if client else ""
     total = len(rows)
 
     html = f"""<!DOCTYPE html>
@@ -1776,7 +1780,7 @@ def trails_dashboard(client: Optional[str] = None, limit: int = 50):
   <span class="meta" id="last-refresh">Last refresh: {_dt.datetime.now(_dt.timezone.utc).strftime("%H:%M:%S UTC")}</span>
 </div>
 <div class="toolbar">
-  <input id="filter-input" type="text" placeholder="Filter by client / agent_id…" value="{client or ''}">
+  <input id="filter-input" type="text" placeholder="Filter by client / agent_id…" value="{safe_client}">
   <button onclick="applyFilter()">Filter</button>
   <span class="count">{total} trail{'s' if total != 1 else ''}</span>
   <span class="refresh">Auto-refresh: 30s</span>
