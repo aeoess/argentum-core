@@ -25,7 +25,7 @@ GENESIS_AGENTS_DEFAULT = frozenset({"giskard-self", "lightning"})
 # Enterprise agents with signed RSA — no daily/monthly rate limit
 ENTERPRISE_AGENTS = frozenset(
     a.strip()
-    for a in os.environ.get("ENTERPRISE_AGENTS", "safeagent-prod").split(",")
+    for a in os.environ.get("ENTERPRISE_AGENTS", "").split(",")
     if a.strip()
 )
 RATE_LIMIT_DEFAULT = int(os.environ.get("TRAIL_DAILY_LIMIT", "100"))
