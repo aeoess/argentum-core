@@ -2537,17 +2537,19 @@ async def nexus_trail(request: Request):
         # Karma solo si el anchor es exitoso (tx_hash != null): karma = actividad verificable on-chain
         TRAIL_KARMA_DELTA = 1
         if _ARB_PAY_OK:
-            def _do_anchor(tid: str, aref: str, aid: str):
+            def _do_anchor(tid: str, aref: str, aid: str, orig: str):
                 tx = _arb_pay.anchor_action_ref(aref)
                 if tx:
                     mycelium_trails.set_trail_tx_hash(TRAILS_DB, tid, tx)
-                    conn = get_db()
-                    upsert_wisdom(conn, aid, aid, "agent",
-                                  karma_delta=TRAIL_KARMA_DELTA, action=True,
-                                  last_action=datetime.now(timezone.utc).isoformat())
-                    conn.commit()
-                    conn.close()
-            _threading.Thread(target=_do_anchor, args=(trail_id, action_ref, agent_id), daemon=True).start()
+                    # Karma solo para trails de clientes externos (origin=nexus)
+                    if orig == "nexus":
+                        conn = get_db()
+                        upsert_wisdom(conn, aid, aid, "agent",
+                                      karma_delta=TRAIL_KARMA_DELTA, action=True,
+                                      last_action=datetime.now(timezone.utc).isoformat())
+                        conn.commit()
+                        conn.close()
+            _threading.Thread(target=_do_anchor, args=(trail_id, action_ref, agent_id, "nexus"), daemon=True).start()
         else:
             # Anchor deshabilitado — no sumar karma (sin verificación on-chain)
             pass
