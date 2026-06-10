@@ -44,7 +44,7 @@ MARKS_API_KEY        = os.environ.get("MARKS_API_KEY", "")
 ARGENTUM_SIGNING_KEY = os.environ.get("ARGENTUM_SIGNING_KEY", "")
 ARGENTUM_VERIFY_KEY  = os.environ.get("ARGENTUM_VERIFY_KEY", "")
 ARGENTUM_BASE_URL    = "https://argentum-api.rgiskard.xyz"
-ARBITRUM_CONTRACT = "0xD467CD1e34515d58F98f8Eb66C0892643ec86AD3"
+ARBITRUM_CONTRACT = "0xe40E376cD32b03E3084F9E0d646155D0Ba0A63ae"
 PAYG_WALLET       = os.environ.get("PAYG_WALLET", "")  # RAMA wallet — PAYG receiver Arbitrum mainnet
 ARB_RPC           = os.environ.get("ARB_RPC", "https://arb1.arbitrum.io/rpc")
 USDC_CONTRACT_ARB = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"  # USDC native Arbitrum One
@@ -1131,6 +1131,29 @@ def create_payg_account(request: Request, agent_id: str):
     return {"api_key": api_key, "agent_id": agent_id, "tier": "free", "credit_trails": 0}
 
 
+@app.post("/payg/account/{api_key}/conformance")
+def set_account_conformance(api_key: str, request: Request, source: str):
+    """Admin — setea conformance_source en una cuenta PAYG.
+
+    Requiere header X-Admin-Token. Source debe ser uno de los tiers en CONFORMANCE_TIER
+    (aps, nobulex, safeagent…) o vacío para resetear.
+    """
+    token = request.headers.get("X-Admin-Token", "")
+    if not ADMIN_TOKEN or not hmac.compare_digest(token, ADMIN_TOKEN):
+        raise HTTPException(401, "invalid or missing X-Admin-Token")
+    account = mycelium_trails.set_conformance_source(TRAILS_DB, api_key, source)
+    if account is None:
+        raise HTTPException(404, "api_key not found")
+    weight = CONFORMANCE_TIER.get((source or "").lower(), KARMA_DEFAULT_WEIGHT)
+    return {
+        "api_key":            account["api_key"],
+        "agent_id":           account["agent_id"],
+        "conformance_source": account["conformance_source"],
+        "karma_weight":       weight,
+        "tier":               "conformance_verified" if source in CONFORMANCE_TIER else "default",
+    }
+
+
 # ── LIGHTNING ────────────────────────────────────────────────────────────────
 
 async def phoenixd_create_invoice(amount_sat: int, description: str, external_id: str) -> dict:
@@ -1820,20 +1843,27 @@ action_ref = hashlib.sha256(canonical).hexdigest()
 
 
 @app.get("/dashboard/trails", response_class=HTMLResponse)
-def trails_dashboard(client: Optional[str] = None, limit: int = 50):
+def trails_dashboard(client: Optional[str] = None, limit: int = 50, show_internal: bool = False):
     """Live trails dashboard — consultable por cliente. Sin push."""
     conn = mycelium_trails._connect(TRAILS_DB)
     if client:
         rows = conn.execute(
-            "SELECT trail_id, agent_id, service, operation, scope, timestamp, action_ref, success, origin "
-            "FROM trails WHERE agent_id = ? OR service = ? "
+            "SELECT trail_id, agent_id, service, operation, scope, timestamp, action_ref, success, origin, tx_hash "
+            "FROM trails WHERE (agent_id = ? OR service = ?) "
             "ORDER BY timestamp DESC LIMIT ?",
             (client, client, min(limit, 200)),
         ).fetchall()
+    elif show_internal:
+        rows = conn.execute(
+            "SELECT trail_id, agent_id, service, operation, scope, timestamp, action_ref, success, origin, tx_hash "
+            "FROM trails ORDER BY timestamp DESC LIMIT ?",
+            (min(limit, 200),),
+        ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT trail_id, agent_id, service, operation, scope, timestamp, action_ref, success, origin "
-            "FROM trails ORDER BY timestamp DESC LIMIT ?",
+            "SELECT trail_id, agent_id, service, operation, scope, timestamp, action_ref, success, origin, tx_hash "
+            "FROM trails WHERE origin != 'pioneer' "
+            "ORDER BY timestamp DESC LIMIT ?",
             (min(limit, 200),),
         ).fetchall()
     conn.close()
@@ -1858,6 +1888,12 @@ def trails_dashboard(client: Optional[str] = None, limit: int = 50):
             origin_badge = '<span class="badge-nexus" title="Trail externo — cliente via /nexus/trail">client</span>'
         else:
             origin_badge = '<span class="badge-internal" title="Trail interno — generado por el sistema">internal</span>'
+        tx_hash_val = r["tx_hash"] if "tx_hash" in r.keys() else None
+        if tx_hash_val:
+            tx_short = tx_hash_val[:10] + "…" + tx_hash_val[-6:]
+            anchor_cell = f'<a class="anchor-link" href="https://arbiscan.io/tx/{e(tx_hash_val, quote=True)}" target="_blank" rel="noopener noreferrer" title="{e(tx_hash_val, quote=True)}">{e(tx_short)} ↗</a>'
+        else:
+            anchor_cell = '<span class="anchor-pending">pending</span>'
         rows_html += f"""<tr>
           <td class="mono dim">{e(r["trail_id"] or "")[:8]}</td>
           <td>{e(r["agent_id"])}</td>
@@ -1868,10 +1904,16 @@ def trails_dashboard(client: Optional[str] = None, limit: int = 50):
           <td class="ts">{e(fmt_ts(r["timestamp"]))}</td>
           <td>{success_badge}</td>
           <td>{origin_badge}</td>
+          <td>{anchor_cell}</td>
         </tr>"""
 
     safe_client = e(client or "", quote=True)
-    client_filter_note = f" — <span class='filter'>client: {safe_client}</span>" if client else ""
+    if client:
+        client_filter_note = f" — <span class='filter'>client: {safe_client}</span>"
+    elif show_internal:
+        client_filter_note = " — <span class='filter'>all (internal included)</span>"
+    else:
+        client_filter_note = " — <span class='filter'>client trails only</span>"
     total = len(rows)
 
     html = f"""<!DOCTYPE html>
@@ -1907,6 +1949,9 @@ def trails_dashboard(client: Optional[str] = None, limit: int = 50):
   .empty{{text-align:center;color:#475569;padding:48px;font-size:.85rem}}
   .badge-nexus{{background:#14532d;color:#86efac;border:1px solid #166534;border-radius:4px;padding:1px 6px;font-size:.72rem;font-weight:600}}
   .badge-internal{{background:#1e293b;color:#64748b;border:1px solid #334155;border-radius:4px;padding:1px 6px;font-size:.72rem}}
+  .anchor-link{{color:#60a5fa;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.75rem;text-decoration:none}}
+  .anchor-link:hover{{text-decoration:underline}}
+  .anchor-pending{{color:#475569;font-size:.75rem}}
 </style>
 </head>
 <body>
@@ -1933,10 +1978,11 @@ def trails_dashboard(client: Optional[str] = None, limit: int = 50):
       <th>Timestamp</th>
       <th></th>
       <th>Origin</th>
+      <th>Anchor</th>
     </tr>
   </thead>
   <tbody>
-    {"" if rows_html else '<tr><td colspan="8" class="empty">No trails found.</td></tr>'}
+    {"" if rows_html else '<tr><td colspan="10" class="empty">No trails found.</td></tr>'}
     {rows_html}
   </tbody>
 </table>
@@ -1976,7 +2022,7 @@ def mycelium_stats(agent_id: str):
         "agent_id": agent_id,
         "trails_by_origin": by_origin,
         "client_trails": client_trails,
-        "total_excluding_incomplete": sum(by_origin.values()),
+        "total_excluding_incomplete": sum(v for k, v in by_origin.items() if k != "pioneer"),
     }
 
 
@@ -2554,6 +2600,8 @@ async def nexus_trail(request: Request):
     payment_hash = body.get("payment_hash", "") or ""
     negotiation_ref = body.get("negotiation_ref") or None
     preimage = body.get("preimage") or {}
+    _origin_raw = body.get("origin", "nexus")
+    origin_val = _origin_raw if _origin_raw in ("nexus", "pioneer") else "nexus"
 
     agent_id = preimage.get("agent_id", "")
     action_type = preimage.get("action_type", "")
@@ -2605,7 +2653,7 @@ async def nexus_trail(request: Request):
         delegation_ref=payment_hash or None,  # payment_hash externo NEXUS
         negotiation_ref=negotiation_ref,
         skip_monthly_limit=payg_consumed,
-        origin="nexus",
+        origin=origin_val,
     )
 
     if trail_id:
@@ -2664,11 +2712,12 @@ async def nexus_trail(request: Request):
     }, status_code=201)
 
 
-DOCUSEAL_TOKEN = os.environ.get("DOCUSEAL_TOKEN", "")
+DOCUSEAL_TOKEN    = os.environ.get("DOCUSEAL_TOKEN", "")
 PIONEER_AGENT_API = os.environ.get("PIONEER_AGENT_API", "http://localhost:8030")
+ADMIN_TOKEN       = os.environ.get("ADMIN_TOKEN", "")
 
 # Hosts autorizados para fetch de PDFs DocuSeal — SSRF allowlist
-_DOCUSEAL_ALLOWED_HOSTS = {"api.docuseal.com", "api.docuseal.co", "app.docuseal.com"}
+_DOCUSEAL_ALLOWED_HOSTS = {"api.docuseal.com", "api.docuseal.co", "app.docuseal.com", "docuseal.com"}
 
 import socket as _socket
 from urllib.parse import urlparse as _urlparse
@@ -2709,11 +2758,23 @@ async def docuseal_webhook(request: Request):
     Computa negotiation_ref = SHA-256(PDF bytes) y delega el trail a Pioneer.
     Autenticación: header X-DocuSeal-Token contra DOCUSEAL_TOKEN env var.
     """
+    # Log only header names (not values) to identify DocuSeal's auth header
+    import logging as _log
+    _REDACT = {"authorization", "cookie", "x-auth-token", "x-docuseal-token",
+               "x-docuseal-signature", "x-webhook-token", "x-api-key"}
+    _log.warning("DOCUSEAL_WEBHOOK header names: %s",
+                 [k for k in request.headers.keys() if k.lower() not in _REDACT])
+
     # Fail-closed: si el token no está configurado el endpoint no opera
     if not DOCUSEAL_TOKEN:
         raise HTTPException(503, "webhook not configured")
-    token = request.headers.get("X-DocuSeal-Token", "")
-    if not hmac.compare_digest(token, DOCUSEAL_TOKEN):
+    sig = (
+        request.headers.get("X-DocuSeal-Signature")
+        or request.headers.get("X-DocuSeal-Token")
+        or request.headers.get("X-Webhook-Token")
+        or ""
+    )
+    if not sig or not hmac.compare_digest(sig, DOCUSEAL_TOKEN):
         raise HTTPException(401, "Invalid DocuSeal token")
 
     try:
@@ -2722,20 +2783,18 @@ async def docuseal_webhook(request: Request):
         return JSONResponse({"error": "invalid JSON"}, status_code=400)
 
     event_type = body.get("event_type", "")
-    if event_type != "form.completed":
+    if event_type not in ("form.completed", "submission.completed"):
         return JSONResponse({"status": "ignored", "event_type": event_type})
 
-    submission = body.get("data", {})
-    submission_id = submission.get("id", "")
-    document_url = submission.get("audit_log_url") or submission.get("url", "")
-    submitters = submission.get("submitters", [])
+    data = body.get("data", {})
 
-    # Identificar firmante externo (azender1 / SafeAgent)
-    signer_email = ""
-    for s in submitters:
-        if s.get("role", "").lower() not in ("sender", "rama", "giskard"):
-            signer_email = s.get("email", "")
-            break
+    # Payload structure: submitter data at top level (email, role) + submission nested
+    submission_id = data.get("submission", {}).get("id") or data.get("id", "")
+    signer_email  = data.get("email", "")
+
+    # Signed contract PDF — first document in documents[], fallback to audit_log_url
+    documents = data.get("documents", [])
+    document_url = (documents[0].get("url") if documents else None) or data.get("audit_log_url", "")
 
     # Descargar PDF para computar SHA-256
     # — solo si la URL pasa la allowlist SSRF; token NO se reenvía a URL externa
@@ -2770,8 +2829,8 @@ async def docuseal_webhook(request: Request):
         import time as _t, json as _j
         ts_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         canonical = _j.dumps(
-            dict(sorted({"agent_id": "pioneer-agent-001", "action_type": "rsa_activation",
-                         "scope": "mycelium.safeagent", "timestamp": ts_str}.items())),
+            {"action_type": "rsa_activation", "agent_id": "pioneer-agent-001",
+             "scope": "mycelium.safeagent", "timestamp": ts_str},
             separators=(",", ":"), ensure_ascii=False,
         ).encode("utf-8")
         action_ref = hashlib.sha256(canonical).hexdigest()
