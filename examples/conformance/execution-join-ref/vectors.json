@@ -533,6 +533,178 @@
         "effective_call_binding": true,
         "post_commit_consistency": false
       }
+    },
+    {
+      "id": "effective-call-binding-covering-deny-001",
+      "description": "Mutation-testing regression (astrogilda/probityai, probityai/agent-evidence#26, 2026-10-23): same envelope as AUTHORIZED_EFFECTIVE_CALL, but the covering decision's outcome is 'deny' instead of permit, decision_id rehashed to match. A decision that structurally recomputes and binds to the effective ref but does not permit it authorizes nothing -- same observable consequence as no covering decision at all. Reuses EFFECTIVE_CALL_REBINDING_FAILED (the spec defines no separate code for \"covers but doesn't permit\"). Same fix already applied in execution-join-ref-remora-bridge (COVERING-DENY, commit 2cc79c9, 2026-10-10) -- ported to this domain, not reinvented.",
+      "expected": "FAIL",
+      "failure_mode": "effective_call_binding",
+      "failure_code": "EFFECTIVE_CALL_REBINDING_FAILED",
+      "failure_detail": "decision_id cf27fa37… recomputes correctly and binds to action_ref 53138a33… (the effective ref here, no rewrite), but its outcome is 'deny', not 'permit'. A decision that denies or defers the call it covers provides no authorization for it.",
+      "envelope": {
+        "version": "execution-join-ref-v1",
+        "action_ref": "53138a338b70ac7cb54165e4175f5432384b44092f2968329212a1661f973b02",
+        "decision_id": "cf27fa37d7d4d8f625e4c114b38ca02576ebf5457e8664ec3ef4002e2565a1ff",
+        "attempt_id": "9c796e94c7cbfbc898791bdafffb9f83d676820435dfdecc40899fb341f3c2bf",
+        "result_id": "121a8185d514f8458f0eee59647f9f4f7b84442c7de185680ae4e73d619e99f0",
+        "proof_ref": null
+      },
+      "preimages": {
+        "decision_id": {
+          "action_ref": "53138a338b70ac7cb54165e4175f5432384b44092f2968329212a1661f973b02",
+          "outcome": "deny",
+          "policy_id": "stripe-payment-guardrail-v2",
+          "ts_ms": 1782900000050,
+          "version": "execution-join-ref-v1"
+        }
+      },
+      "checks": {
+        "canonical_envelope": true,
+        "chain_integrity": true,
+        "effective_call_binding": false
+      }
+    },
+    {
+      "id": "effective-call-binding-covering-defer-001",
+      "description": "Mutation-testing regression (astrogilda/probityai, probityai/agent-evidence#26, 2026-10-23): same envelope as AUTHORIZED_EFFECTIVE_CALL, but the covering decision's outcome is 'defer' instead of permit, decision_id rehashed to match. A decision that structurally recomputes and binds to the effective ref but does not permit it authorizes nothing -- same observable consequence as no covering decision at all. Reuses EFFECTIVE_CALL_REBINDING_FAILED (the spec defines no separate code for \"covers but doesn't permit\"). Same fix already applied in execution-join-ref-remora-bridge (COVERING-DENY, commit 2cc79c9, 2026-10-10) -- ported to this domain, not reinvented.",
+      "expected": "FAIL",
+      "failure_mode": "effective_call_binding",
+      "failure_code": "EFFECTIVE_CALL_REBINDING_FAILED",
+      "failure_detail": "decision_id 562e4348… recomputes correctly and binds to action_ref 53138a33… (the effective ref here, no rewrite), but its outcome is 'defer', not 'permit'. A decision that denies or defers the call it covers provides no authorization for it.",
+      "envelope": {
+        "version": "execution-join-ref-v1",
+        "action_ref": "53138a338b70ac7cb54165e4175f5432384b44092f2968329212a1661f973b02",
+        "decision_id": "562e43487d1eee99e7c16157e63b84cd38ca02e5d8e6a2a5e3f75a9d6be8bc0c",
+        "attempt_id": "9c796e94c7cbfbc898791bdafffb9f83d676820435dfdecc40899fb341f3c2bf",
+        "result_id": "121a8185d514f8458f0eee59647f9f4f7b84442c7de185680ae4e73d619e99f0",
+        "proof_ref": null
+      },
+      "preimages": {
+        "decision_id": {
+          "action_ref": "53138a338b70ac7cb54165e4175f5432384b44092f2968329212a1661f973b02",
+          "outcome": "defer",
+          "policy_id": "stripe-payment-guardrail-v2",
+          "ts_ms": 1782900000050,
+          "version": "execution-join-ref-v1"
+        }
+      },
+      "checks": {
+        "canonical_envelope": true,
+        "chain_integrity": true,
+        "effective_call_binding": false
+      }
+    },
+    {
+      "id": "file-write-rebinding-fixed-001",
+      "description": "Regression companion to file-write-rebinding-failed-001 (astrogilda/probityai, probityai/agent-evidence#26, 2026-10-23, mutation testing): same guardrail permit over /reports/draft-q3.pdf, but the dispatched write now targets that same path -- the defect (effective path != approved path) is removed. effective_action_ref recomputes to the same digest as action_ref, and the original decision_id legitimately covers it. Confirms the verifier does not keep reporting EFFECTIVE_CALL_REBINDING_FAILED once the rewrite that caused it is undone.",
+      "expected": "PASS",
+      "envelope": {
+        "version": "execution-join-ref-v1",
+        "action_ref": "2a65d1ea532045ba592a124e54d1f953da585a70589aa3e25b698a955c537a19",
+        "decision_id": "be2898bf65856e5724027ee6ffa72d897994e886b9e176cda86bb436b7a949f0",
+        "attempt_id": "9c796e94c7cbfbc898791bdafffb9f83d676820435dfdecc40899fb341f3c2bf",
+        "result_id": "121a8185d514f8458f0eee59647f9f4f7b84442c7de185680ae4e73d619e99f0",
+        "proof_ref": null,
+        "effective_action_ref": "2a65d1ea532045ba592a124e54d1f953da585a70589aa3e25b698a955c537a19"
+      },
+      "preimages": {
+        "action_ref": {
+          "actor_id": "agent-report-filer-v1",
+          "input_hash": "c1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2",
+          "scope": "fs.write.create",
+          "ts_ms": 1783000000000,
+          "version": "execution-join-ref-v1"
+        },
+        "decision_id": {
+          "action_ref": "2a65d1ea532045ba592a124e54d1f953da585a70589aa3e25b698a955c537a19",
+          "outcome": "permit",
+          "policy_id": "fs-write-guardrail-v1",
+          "ts_ms": 1783000000050,
+          "version": "execution-join-ref-v1"
+        },
+        "effective_action_ref": {
+          "actor_id": "agent-report-filer-v1",
+          "input_hash": "c1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2",
+          "scope": "fs.write.create",
+          "ts_ms": 1783000000000,
+          "version": "execution-join-ref-v1"
+        }
+      },
+      "checks": {
+        "canonical_envelope": true,
+        "chain_integrity": true,
+        "no_duplicate_attempt": true,
+        "result_uniqueness": true,
+        "proof_binding": true,
+        "effective_call_binding": true
+      }
+    },
+    {
+      "id": "post-commit-consistency-confirmed-001",
+      "description": "Regression companion to post-commit-divergence-001 (astrogilda/probityai, probityai/agent-evidence#26, 2026-10-23, mutation testing): same join record, but the later fs-integrity-monitor observation now reports the same hash the approved write originally committed -- the divergence is gone. post_commit_consistency recomputes true. Confirms the verifier does not keep reporting POST_COMMIT_DIVERGENCE once the content the observation reports actually matches.",
+      "expected": "PASS",
+      "envelope": {
+        "version": "execution-join-ref-v1",
+        "action_ref": "8ea9b64aa071a946fb929be51c764d43fe597066872d35ae60972cfb83f93f79",
+        "decision_id": "99ceb0c244c1aa412b2503981a5e3dc335fa2e9f53dd146e317cf5f5bf5b96cb",
+        "attempt_id": "20d4b3264dc4e2dd7a11ca93e360be162e871f5b18a7750829e5beff7446372f",
+        "result_id": "d61e107f2507d23de1d77c54f1674ae031b2087f7ba34715c84aa4e2493533fd",
+        "proof_ref": "a84b95f39f6894f7d597fb98facd1e0624cd4eacbb708fbb5fd9fde282a0ca7d",
+        "post_commit_ref": "df974fda8fddaec971666820d672b6f0c93728639d232ffae593919501ca8fa3"
+      },
+      "preimages": {
+        "action_ref": {
+          "actor_id": "agent-report-filer-v1",
+          "input_hash": "d2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3",
+          "scope": "fs.write.create",
+          "ts_ms": 1783100000000,
+          "version": "execution-join-ref-v1"
+        },
+        "decision_id": {
+          "action_ref": "8ea9b64aa071a946fb929be51c764d43fe597066872d35ae60972cfb83f93f79",
+          "outcome": "permit",
+          "policy_id": "fs-write-guardrail-v1",
+          "ts_ms": 1783100000050,
+          "version": "execution-join-ref-v1"
+        },
+        "attempt_id": {
+          "action_ref": "8ea9b64aa071a946fb929be51c764d43fe597066872d35ae60972cfb83f93f79",
+          "attempt_seq": 1,
+          "executor_id": "runtime-node-11",
+          "ts_ms": 1783100000100,
+          "version": "execution-join-ref-v1"
+        },
+        "result_id": {
+          "attempt_id": "20d4b3264dc4e2dd7a11ca93e360be162e871f5b18a7750829e5beff7446372f",
+          "outcome": "completed",
+          "output_hash": "0ab1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1",
+          "ts_ms": 1783100001200,
+          "version": "execution-join-ref-v1"
+        },
+        "proof_ref": {
+          "attempt_id": "20d4b3264dc4e2dd7a11ca93e360be162e871f5b18a7750829e5beff7446372f",
+          "evidence_type": "fs_write_confirmation",
+          "external_ref": "fswrite-evt-7f2c9a1e",
+          "ts_ms": 1783100002000,
+          "version": "execution-join-ref-v1"
+        },
+        "post_commit_observation": {
+          "observed_hash": "0ab1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1",
+          "observed_at_ms": 1783186400000,
+          "observer_id": "fs-integrity-monitor-v1",
+          "result_id": "d61e107f2507d23de1d77c54f1674ae031b2087f7ba34715c84aa4e2493533fd",
+          "version": "execution-join-ref-v1"
+        }
+      },
+      "checks": {
+        "canonical_envelope": true,
+        "chain_integrity": true,
+        "no_duplicate_attempt": true,
+        "result_uniqueness": true,
+        "proof_binding": true,
+        "effective_call_binding": true,
+        "post_commit_consistency": true
+      }
     }
   ],
   "provenance": {

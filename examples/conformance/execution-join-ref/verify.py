@@ -62,11 +62,22 @@ reported failure_mode:
                              envelope's effective_action_ref if present,
                              otherwise action_ref itself) must be covered by
                              a decision: decision_id's preimage.action_ref
-                             must equal that target ref, AND (if the decision
-                             preimage declares policy_expires_ms) that policy
-                             must not have already expired at the decision's
-                             own ts_ms. Only computed when a decision_id
-                             preimage is supplied.
+                             must equal that target ref, its outcome must be
+                             "permit" (fixed 2026-10-23, mutation-tested gap
+                             reported by astrogilda/probityai, same fix
+                             already applied in the sibling
+                             execution-join-ref-remora-bridge repo at
+                             2cc79c9, 2026-10-10 -- a decision that
+                             structurally covers the ref but denies or
+                             defers it authorizes nothing, same observable
+                             consequence as no covering decision at all;
+                             reuses EFFECTIVE_CALL_REBINDING_FAILED rather
+                             than a new code, since the spec defines none
+                             for "covers but doesn't permit"), AND (if the
+                             decision preimage declares policy_expires_ms)
+                             that policy must not have already expired at
+                             the decision's own ts_ms. Only computed when a
+                             decision_id preimage is supplied.
   7. post_commit_consistency (additive, this change) — see
                              POST_COMMIT_DIVERGENCE below.
 
@@ -255,6 +266,7 @@ def verify_vector(vector: dict) -> tuple[bool, list[str], dict]:
             decision_pre is not None
             and "decision_id" not in malformed_refs
             and decision_pre.get("action_ref") == target_ref
+            and decision_pre.get("outcome") == "permit"
         )
         policy_ok = True
         if decision_pre is not None and "policy_expires_ms" in decision_pre:
@@ -284,6 +296,51 @@ def verify_vector(vector: dict) -> tuple[bool, list[str], dict]:
     return (len(failures) == 0), failures, computed
 
 
+def _expected_reason_confirmed(vector: dict, computed: dict, failures: list[str]) -> bool:
+    """For an `expected: FAIL` vector: not just "did it fail" but "did it fail
+    for the declared reason". Without this, a FAIL vector whose real defect
+    was mutated away still reads as a correct rejection as long as *some*
+    unrelated failure is present in `failures` -- e.g. a stale `checks` entry
+    left over from before the mutation, which `_check()` reports as a
+    "fixture mismatch" rather than the invariant actually being exercised.
+    (Found by astrogilda/probityai via mutation testing, 2026-10-23: remove a
+    FAIL vector's defect without updating `checks` to match, and the old
+    summary logic -- `ok = not conforms` -- still printed "correctly
+    rejected" under the vector's original failure_code, because `conforms`
+    was still False for the unrelated stale-declaration reason.)
+
+    Ground truth for "the declared reason" is the vector's own `checks` dict:
+    whichever keys it declares False are the invariants this vector exists to
+    fail. At least one of those must still be False in `computed` -- the key
+    recomputing, independently, to the same answer the fixture declares, not
+    merely "the overall tally has a nonzero failure count".
+
+    Two more keys are declared-only by design (no_duplicate_attempt,
+    result_uniqueness -- see verify_vector()'s own comment: these require a
+    registry spanning records outside any single vector, so they are never
+    written to `computed` at all, only asserted via a dedicated `failures`
+    string). Confirmed via that same string.
+
+    Two codes never declare a False key in `checks` -- they halt before any
+    invariant is computed at all (UNSUPPORTED_CANONICAL_PROFILE, structural
+    profile-resolution failure; VERIFIER_OFFLINE, no preimage material).
+    Confirmed via the sentinel string verify_vector() already prefixes to its
+    one failure entry for each.
+    """
+    declared_only_keys = {"no_duplicate_attempt", "result_uniqueness"}
+    declared_false = [k for k, val in vector.get("checks", {}).items() if val is False]
+    for key in declared_false:
+        if key in declared_only_keys:
+            if any(f.startswith(f"{key}:") for f in failures):
+                return True
+        elif computed.get(key) is False:
+            return True
+    if declared_false:
+        return False
+    sentinel = vector.get("failure_mode") or vector.get("failure_code") or ""
+    return bool(sentinel) and any(f.startswith(f"{sentinel}:") for f in failures)
+
+
 def main():
     vectors_path = Path(__file__).parent / "vectors.json"
     data = json.loads(vectors_path.read_text())
@@ -299,20 +356,25 @@ def main():
         expected = v["expected"]
         conforms, failures, computed = verify_vector(v)
 
-        ok = conforms if expected == "PASS" else not conforms
+        if expected == "PASS":
+            ok = conforms
+        else:
+            ok = (not conforms) and _expected_reason_confirmed(v, computed, failures)
         marker = "✓" if ok else "✗"
         status = "PASS" if ok else "FAIL"
+        code = v.get("failure_code") or v.get("failure_mode", "?")
 
         print(f"  {marker} [{status}] {vid}")
         if ok and not conforms and expected == "FAIL":
-            code = v.get("failure_code") or v.get("failure_mode", "?")
             print(f"         correctly rejected ({code}): {failures[0] if failures else '(declared)'}")
         elif not ok:
             if expected == "PASS":
                 for f in failures:
                     print(f"         unexpected failure: {f}")
+            elif conforms:
+                print(f"         expected FAIL ({code}) but verifier accepted it")
             else:
-                print(f"         expected FAIL ({v.get('failure_code') or v.get('failure_mode', '?')}) but verifier accepted it")
+                print(f"         expected FAIL ({code}), but the failure doesn't reproduce it: {failures}")
 
         if ok:
             passed += 1
