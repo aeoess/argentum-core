@@ -12,10 +12,10 @@ Listing criteria — everything in this table is verifiable from the public reco
 
 | Provider | System | Conformance set | Production since | Status |
 |----------|--------|-----------------|------------------|--------|
-| TKCollective | AgentOracle + AgentTrust | `agentoracle-v1` | 2026-06 | Declared Provider |
+| TKCollective | Tanilo + AgentTrust | `agentoracle-v1` | 2026-06 | Declared Provider |
 | azender1 | SafeAgent | `safeagent` | 2026-06 | Verified Provider |
 
-Declaration snippet (what "Declared" looks like — same badge AgentOracle uses):
+Declaration snippet (what "Declared" looks like — same badge Tanilo uses):
 
     [![Mycelium Provider](https://img.shields.io/badge/Mycelium-Provider-4a90e2)](https://github.com/giskard09/argentum-core/blob/main/docs/mycelium-provider-protocol.md)
 
