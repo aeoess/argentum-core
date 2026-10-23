@@ -192,6 +192,54 @@ def _result(verdict, completeness, at_seq=None, reason=None, **extra):
     return r
 
 
+def verify_checkpoint_cadence(checkpoints: list[dict], declared_max_period_s) -> dict:
+    """Check a consumer-declared upper bound on the gap between consecutive
+    checkpoints of one agent (see "Cadence ceiling" in the spec).
+
+    The checkpoint rule ("a checkpoint MUST be emitted for every period")
+    does not bound the period length itself: an operator can declare an
+    hour-long period, or a year-long one, and still satisfy it. A longer
+    period only widens the window in which a tail cut is undetectable. This
+    check is a consumer-side policy layered on top of that rule, not a
+    property of any single checkpoint: two consumers with different
+    `declared_max_period_s` can disagree on the same stream, and both are
+    right under their own bound.
+
+    checkpoints: one agent's checkpoint stream, any order. Compared pairwise
+      after sorting by `period_end`. Fewer than 2 checkpoints has no gap to
+      measure and is always "ok".
+    declared_max_period_s: the ceiling, in seconds. Must be a positive
+      number.
+
+    The gap check runs on `period_end` alone, independent of whether the
+    checkpoints on either side are otherwise well formed (that is
+    `verify_trail`'s job) — only a missing or unparseable `period_end`
+    is reported here as "malformed".
+    """
+    if not isinstance(declared_max_period_s, (int, float)) or isinstance(declared_max_period_s, bool) \
+            or declared_max_period_s <= 0:
+        raise ValueError("declared_max_period_s must be a positive number")
+    if not isinstance(checkpoints, list):
+        return {"verdict": "malformed", "reason": "not_a_list"}
+    if len(checkpoints) < 2:
+        return {"verdict": "ok"}
+    try:
+        ordered = sorted(checkpoints, key=lambda c: _parse_ts(c["period_end"]))
+    except (KeyError, TypeError, ValueError):
+        return {"verdict": "malformed", "reason": "period_end"}
+    for prev, cur in zip(ordered, ordered[1:]):
+        gap = (_parse_ts(cur["period_end"]) - _parse_ts(prev["period_end"])).total_seconds()
+        if gap > declared_max_period_s:
+            return {
+                "verdict": "period_exceeds_declared_maximum",
+                "prev_period_end": prev["period_end"],
+                "period_end": cur["period_end"],
+                "gap_s": gap,
+                "declared_max_period_s": declared_max_period_s,
+            }
+    return {"verdict": "ok"}
+
+
 def verify_trail(
     entries: list[dict],
     checkpoint: Optional[dict] = None,
