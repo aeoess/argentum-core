@@ -17,7 +17,7 @@ from plugins.agt_evidence_anchor.action_ref import compute_action_ref  # noqa: E
 from plugins.agt_evidence_anchor.merkle import get_proof  # noqa: E402
 from plugins.agt_evidence_anchor.trail_head import (  # noqa: E402
     append_entry, checkpoint_digest, compute_head, entry_preimage,
-    make_checkpoint, seal_period, verify_trail,
+    make_checkpoint, seal_period, verify_checkpoint_cadence, verify_trail,
 )
 
 AGENT = "agent-alpha"
@@ -395,3 +395,97 @@ def test_full_log_missing_its_head_is_not_a_window():
 def test_full_log_reports_genesis_scope():
     r = verify_trail(_log(3))
     assert (r["from_seq"], r["window_anchor"]) == (1, "genesis")
+
+
+# ── Cadence ceiling (AP2#290, nmatt1) ───────────────────────────────────────
+
+T3 = "2026-09-23T21:00:00.000Z"  # T1 + 3h
+HOUR = 3600
+
+
+def test_cadence_within_ceiling_is_ok():
+    log = _log(3)
+    cps = [make_checkpoint(AGENT, T1, log), make_checkpoint(AGENT, T2, log)]
+    assert verify_checkpoint_cadence(cps, HOUR) == {"verdict": "ok"}
+
+
+def test_cadence_at_exactly_the_ceiling_is_ok():
+    """A gap equal to the ceiling is not a violation — only strictly over it."""
+    log = _log(3)
+    cps = [make_checkpoint(AGENT, T1, log), make_checkpoint(AGENT, T2, log)]
+    assert verify_checkpoint_cadence(cps, HOUR)["verdict"] == "ok"
+
+
+def test_cadence_exceeds_ceiling():
+    log = _log(3)
+    cps = [make_checkpoint(AGENT, T1, log), make_checkpoint(AGENT, T3, log)]
+    r = verify_checkpoint_cadence(cps, HOUR)
+    assert r["verdict"] == "period_exceeds_declared_maximum"
+    assert (r["prev_period_end"], r["period_end"]) == (T1, T3)
+    assert r["gap_s"] == 3 * HOUR
+    assert r["declared_max_period_s"] == HOUR
+
+
+def test_cadence_checks_every_consecutive_pair():
+    """One blown gap among several checkpoints is still caught, wherever it is."""
+    log = _log(3)
+    cps = [make_checkpoint(AGENT, T1, log), make_checkpoint(AGENT, T2, log),
+           make_checkpoint(AGENT, T3, log)]
+    r = verify_checkpoint_cadence(cps, HOUR)
+    assert r["verdict"] == "period_exceeds_declared_maximum"
+    assert (r["prev_period_end"], r["period_end"]) == (T2, T3)
+
+
+def test_cadence_order_independent():
+    """Checkpoints are sorted by period_end before comparing, not taken as-is."""
+    log = _log(3)
+    cps = [make_checkpoint(AGENT, T3, log), make_checkpoint(AGENT, T1, log)]
+    r = verify_checkpoint_cadence(cps, HOUR)
+    assert r["verdict"] == "period_exceeds_declared_maximum"
+    assert (r["prev_period_end"], r["period_end"]) == (T1, T3)
+
+
+def test_cadence_fewer_than_two_checkpoints_is_ok():
+    log = _log(3)
+    assert verify_checkpoint_cadence([], HOUR) == {"verdict": "ok"}
+    assert verify_checkpoint_cadence([make_checkpoint(AGENT, T1, log)], HOUR) == {"verdict": "ok"}
+
+
+def test_cadence_ignores_checkpoint_well_formedness():
+    """The gap check runs on period_end alone — a checkpoint invalid in every
+    other way (bad head, wrong v) still gets compared, per the spec's
+    "independent of whether the checkpoints ... are individually well
+    formed." Catching a forged/incomplete checkpoint is verify_trail's job,
+    not this one's."""
+    bogus_early = {"v": "not-the-right-v", "agent_id": AGENT, "period_end": T1,
+                   "seq": "not-an-int", "head": "not-hex64"}
+    bogus_late = {"v": "also-wrong", "agent_id": AGENT, "period_end": T2,
+                  "seq": "also-not-an-int", "head": "still-not-hex64"}
+    assert verify_checkpoint_cadence([bogus_early, bogus_late], HOUR) == {"verdict": "ok"}
+    r = verify_checkpoint_cadence([bogus_early, dict(bogus_late, period_end=T3)], HOUR)
+    assert r["verdict"] == "period_exceeds_declared_maximum"
+
+
+def test_cadence_malformed_period_end():
+    log = _log(2)
+    cp1 = make_checkpoint(AGENT, T1, log)
+    cp_missing = dict(make_checkpoint(AGENT, T2, log))
+    del cp_missing["period_end"]
+    assert verify_checkpoint_cadence([cp1, cp_missing], HOUR) == \
+        {"verdict": "malformed", "reason": "period_end"}
+
+    cp_bad = dict(make_checkpoint(AGENT, T2, log), period_end="not-a-timestamp")
+    assert verify_checkpoint_cadence([cp1, cp_bad], HOUR) == \
+        {"verdict": "malformed", "reason": "period_end"}
+
+
+def test_cadence_not_a_list_is_malformed():
+    assert verify_checkpoint_cadence(None, HOUR) == {"verdict": "malformed", "reason": "not_a_list"}
+
+
+@pytest.mark.parametrize("bad", [0, -1, -3600])
+def test_cadence_declared_max_period_must_be_positive(bad):
+    log = _log(2)
+    cps = [make_checkpoint(AGENT, T1, log), make_checkpoint(AGENT, T2, log)]
+    with pytest.raises(ValueError):
+        verify_checkpoint_cadence(cps, bad)
