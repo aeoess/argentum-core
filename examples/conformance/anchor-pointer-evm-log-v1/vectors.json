@@ -1,0 +1,217 @@
+{
+  "spec_version": "anchor-pointer-evm-log-v1",
+  "license": "CC0-1.0",
+  "description": "Conformance vectors for the EVM-log anchor-pointer mechanism requested by Tetsurohhori (aos-standard/catalog) in aeoess/agent-governance-vocabulary#217: {chain, contract, tx, log_index, height} resolved against a live EVM node, with anchored_digest checked against the indexed topic of the Anchored event at that exact log position. No proof blob is pinned -- for EVM, the chain itself is the proof, queried live. These vectors carry no code: an independent reader is expected to resolve each one against a real Base-mainnet (and, for two negatives, Arbitrum-mainnet) RPC endpoint.",
+  "mechanism": {
+    "event_signature": "Anchored(bytes32 indexed ref, address indexed anchoredBy, uint256 timestamp)",
+    "event_topic0": "0xfe2289542f7a0110ac112c3a4d712afdcaaf2900a1326f4e6f340b563a0e8734",
+    "contract": "AnchorRegistry, permissionless, single function anchor(bytes32 ref). Canonical CREATE2 address, identical on Base (8453), Arbitrum One (42161) and Ink (57073): 0x49fEcA52bC634a9Ab773226D16619deC547794aa.",
+    "resolution": "Fetch the transaction receipt for `tx` on `chain`. Find the log in receipt.logs whose logIndex == `log_index`. Verify: log.address == `contract` (case-insensitive); log.blockNumber == `height`; log.topics[0] == event_topic0; log.topics[1] == `anchored_digest` (case-insensitive). anchoredBy (topics[2]) and timestamp (data) are informational, not checked by this vector set.",
+    "note_on_proof": "No `proof` field is required for this mechanism -- the live receipt lookup above IS the proof. A vector may carry `proof: null` to confirm a reader does not wrongly require it."
+  },
+  "primary_source": {
+    "note": "The positive vector is a real anchor, independently re-verified against eth_getTransactionReceipt on https://mainnet.base.org on 2026-10-23 (not taken from any script printout or prior write-up). It anchors the gt-v2.1 release-statement digest that AXES (magentixai, axes#18) requested in axes#3 as a custody record -- the anchored_digest below is a byte-exact match against the calldata AXES supplied, confirmed independently before this file was built. The preimage behind that digest is AXES's write_once_store construction, out of scope here: this vector set tests only the EVM anchor-pointer mechanism, not the digest's own preimage spec.",
+    "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+    "chain": "Base mainnet, eip155:8453",
+    "block": 52987624,
+    "block_timestamp_utc": "2026-10-23T14:09:55Z"
+  },
+  "vectors": [
+    {
+      "id": "anchor-pointer-evm-positive-001",
+      "description": "Baseline: the real gt-v2.1 custody anchor, all fields exactly as returned by eth_getTransactionReceipt. No proof field.",
+      "expected": "PASS",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-positive-002-contract-case",
+      "description": "Same real anchor; contract address given lowercase, no EIP-55 checksum casing. EVM addresses are case-insensitive -- a reader that requires exact checksum casing on this field is over-strict.",
+      "expected": "PASS",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49feca52bc634a9ab773226d16619dec547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-positive-003-txhash-case",
+      "description": "Same real anchor; tx hash given with an uppercase hex body. Hex is case-insensitive -- a reader that lowercases before RPC lookup (or treats the RPC's own case-insensitivity as sufficient) should still resolve this.",
+      "expected": "PASS",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4D4B45F7DDB970BF37A640D651F24BC0E26A4ACDB2E14285C19A9F3F95C720F7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-positive-004-explicit-null-proof",
+      "description": "Same real anchor, with an explicit `proof: null` field present. Confirms proof is optional-by-mechanism for EVM (the chain query is the proof) and must not be required or treated as a failure when absent or null.",
+      "expected": "PASS",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299",
+        "proof": null
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-contract-001",
+      "description": "Real chain, real confirmed tx -- but `contract` names a different real, live contract on Base (USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913, 1852 bytes of deployed code, confirmed via eth_getCode 2026-10-23), not AnchorRegistry. The log at log_index 59 of this tx is emitted by AnchorRegistry's address, not the declared contract.",
+      "expected": "FAIL",
+      "failure_mode": "contract_mismatch",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-chain-001",
+      "description": "Correct tx hash, but `chain` declares Arbitrum One (eip155:42161) instead of Base. This exact tx hash does not exist on Arbitrum -- confirmed live via eth_getTransactionReceipt on https://arb1.arbitrum.io/rpc on 2026-10-23, result: null. AnchorRegistry is deployed at the same address on both chains, which is exactly why the chain field must be checked and not inferred from the contract address alone.",
+      "expected": "FAIL",
+      "failure_mode": "tx_not_found_on_chain",
+      "input": {
+        "chain": "eip155:42161",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-chain-002-malformed",
+      "description": "Chain id given as a bare number without the CAIP-2 'eip155:' namespace. Format-level rejection, not a chain-resolution failure -- a reader should reject this before attempting any RPC call.",
+      "expected": "FAIL",
+      "failure_mode": "malformed_chain_id",
+      "input": {
+        "chain": "8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-txhash-001-not-found",
+      "description": "Syntactically well-formed 32-byte tx hash that does not correspond to any transaction on Base. Confirmed live via eth_getTransactionReceipt on https://mainnet.base.org on 2026-10-23, result: null.",
+      "expected": "FAIL",
+      "failure_mode": "tx_not_found",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "log_index": 0,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-destination-001",
+      "description": "Real, confirmed Base tx (status 0x1), same block (52987624) as the positive vector -- but its `to` is 0x4200000000000000000000000000000000000015 (the L1Block predeploy), not AnchorRegistry, and it emits no logs at all. Confirmed live via eth_getTransactionReceipt on 2026-10-23.",
+      "expected": "FAIL",
+      "failure_mode": "destination_mismatch",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x476f2ccddf586dd7f2a1cb66f1aed5cc17e76984272810716a8f946b803b7a41",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-logindex-001",
+      "description": "Real tx, real contract, real digest -- but `log_index` is 0. This tx's receipt has exactly one log, at logIndex 59 (0x3b); there is no log at index 0 belonging to this tx. (This tx has only one log in total, confirmed live 2026-10-23, so there is no second real log to point at instead -- log_index 0 stands in for 'declared index does not resolve to this tx's Anchored log.')",
+      "expected": "FAIL",
+      "failure_mode": "log_index_mismatch",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 0,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-height-001-wrong",
+      "description": "Real tx, but `height` declares 52986624 (1000 blocks earlier -- itself a real, already-mined Base block, not a nonsense number) instead of the tx's actual block, 52987624.",
+      "expected": "FAIL",
+      "failure_mode": "height_mismatch",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52986624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-height-002-unreachable",
+      "description": "Real tx, but `height` declares 999999999999 -- far beyond Base's current chain head (52987624 at anchor time; ~53007902 when this file was built, 2026-10-23). Distinct failure class from -height-001: here the declared height cannot yet be real at all, versus a real-but-wrong block.",
+      "expected": "FAIL",
+      "failure_mode": "height_unreachable",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 999999999999,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88299"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-digest-001-nibble-flip",
+      "description": "Real tx/contract/chain/height/log_index, but `anchored_digest` has its last hex nibble flipped (…de88299 -> …de88298) relative to the real topics[1] value.",
+      "expected": "FAIL",
+      "failure_mode": "digest_mismatch",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xd8b6a69f57ba2209561fb551443c096c47fcb0cb6db37005fd0713690de88298"
+      }
+    },
+    {
+      "id": "anchor-pointer-evm-negative-digest-002-real-but-wrong-anchor",
+      "description": "Harder variant of -digest-001: `anchored_digest` is not nonsense, it is itself a real, validly anchored 32-byte ref in the same AnchorRegistry contract -- just from a different anchor (giskard09/dapr-history-anchor, tx 0x8702287dca01fb5faa76ec8c95b67322d2f685e634747ba9177082bd72c50a39, Base block 48545657, re-verified live via eth_getTransactionReceipt on 2026-10-23). It is not the ref emitted by THIS tx's log. Tests that a reader checks the digest against the specific (tx, log_index) pointed to, not against 'any ref this registry has ever anchored.'",
+      "expected": "FAIL",
+      "failure_mode": "digest_mismatch",
+      "input": {
+        "chain": "eip155:8453",
+        "contract": "0x49fEcA52bC634a9Ab773226D16619deC547794aa",
+        "tx": "0x4d4b45f7ddb970bf37a640d651f24bc0e26a4acdb2e14285c19a9f3f95c720f7",
+        "log_index": 59,
+        "height": 52987624,
+        "anchored_digest": "0xe2883741562df2096aec27ce2ffa26e157d2898ac9ec444d245b39b6c8f0efea"
+      }
+    }
+  ],
+  "omitted_by_design": {
+    "reorg_finality": "No reorg/finality vector is included in this draft. A static JSON fixture cannot encode 'chain state changed between read and verify' -- that is a property of how a live reader handles confirmations/finality tags on its own RPC calls, not something a fixed (chain, tx, log_index, height, digest) tuple can represent. Flagging this as a possible follow-on if useful, not building it speculatively."
+  }
+}
