@@ -15,7 +15,7 @@ and never normalizes field values to force a match.
 
 | File | Vectors | What it holds |
 |------|---------|---------------|
-| [`recompute-drift-v1-positive.fixture.json`](./recompute-drift-v1-positive.fixture.json) | 5 | Tuples that recompute byte-identical. Each digest was computed by two independent paths (a shipping TypeScript implementation and a stdlib-only SHA-256 over the JCS bytes) and byte-checked equal before inclusion. |
+| [`recompute-drift-v1-positive.fixture.json`](./recompute-drift-v1-positive.fixture.json) | 4 | Tuples that recompute byte-identical. Each digest was computed by two independent paths (a shipping TypeScript implementation and a stdlib-only SHA-256 over the JCS bytes) and byte-checked equal before inclusion. |
 | [`recompute-drift-v1-negative.fixture.json`](./recompute-drift-v1-negative.fixture.json) | 9 | Drifted claims that MUST fail closed. Every `claimed_action_ref` is a real SHA-256 digest of a stated drifted byte form, included in the vector, so the forbidden recovery move is explicit per vector. |
 
 ## Positive vectors
@@ -24,9 +24,14 @@ and never normalizes field values to force a match.
 |--------|--------|
 | `0001-basic` | Minimal four-field tuple, namespace-prefixed scope |
 | `0002-unicode-fields` | Non-ASCII BMP characters in `agent_id` and `scope`, raw UTF-8 per JCS |
-| `0003-empty-scope` | `scope: ""`, valid per the spec field table |
 | `0004-ms-floor` | Timestamp fractional part `.000`, no trailing-zero suppression |
 | `0005-ms-ceiling` | Timestamp fractional part `.999`, no rounding or carry |
+
+`0003-empty-scope` was removed on 2026-11-01. The 2026-08-25 erratum for `action-ref-v1.0`
+gives `scope` as non-empty with no `""` exception, so an empty scope is outside the input
+domain and has no `action_ref`. `av-007` in
+[`../action-ref-v1-domain-negative/`](../action-ref-v1-domain-negative/) is the vector that
+rejects it. The id is not reused.
 
 ## Negative drift families
 
