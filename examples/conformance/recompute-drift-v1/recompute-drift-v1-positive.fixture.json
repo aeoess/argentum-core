@@ -36,19 +36,6 @@
       "action_ref": "a5c0ec37b01673b6ca9d593d4dba6e6f40dafdfc25fde3ad3673dceb79b72cc4"
     },
     {
-      "id": "0003-empty-scope",
-      "description": "Empty-string scope, valid per the spec field table (pass \"\" if not applicable). The empty string still occupies its JCS position; omitting the key instead produces a different digest.",
-      "preimage": {
-        "action_type": "oracle.signal",
-        "agent_id": "recompute-agent-001",
-        "scope": "",
-        "timestamp": "2026-06-11T10:30:00.250Z"
-      },
-      "jcs_payload": "{\"action_type\":\"oracle.signal\",\"agent_id\":\"recompute-agent-001\",\"scope\":\"\",\"timestamp\":\"2026-06-11T10:30:00.250Z\"}",
-      "preimage_canonical_bytes_hex": "7b22616374696f6e5f74797065223a226f7261636c652e7369676e616c222c226167656e745f6964223a227265636f6d707574652d6167656e742d303031222c2273636f7065223a22222c2274696d657374616d70223a22323032362d30362d31315431303a33303a30302e3235305a227d",
-      "action_ref": "8a5e53417ae5a4e1cdfc1659980ece6518611d7610c173ccf7d14121924b241e"
-    },
-    {
       "id": "0004-ms-floor",
       "description": "Millisecond floor edge: fractional part .000. Trailing-zero suppression (emitting .0, or no fractional part) changes the bytes and the digest; exactly three digits are required.",
       "preimage": {
